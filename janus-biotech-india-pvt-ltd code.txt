@@ -1,0 +1,3580 @@
+PK
+     HY=\òP˜%ú   ú   
+   metadata.json{
+  "name": "Janus Biotech India Pvt Ltd",
+  "description": "A comprehensive B2B Digital Product Library & Order Management Portal for Pharma Franchises."
+}PK
+     HY=\.∆äK	  K	     types.tsexport enum UserRole {
+  ADMIN = 'ADMIN',
+  STAFF = 'STAFF',
+  CUSTOMER = 'CUSTOMER'
+}
+
+export enum StockStatus {
+  AVAILABLE = 'Available',
+  LOW_STOCK = 'Low Stock',
+  COMING_SOON = 'Coming Soon',
+  OUT_OF_STOCK = 'Out of Stock'
+}
+
+export enum OrderStatus {
+  PENDING = 'Pending',
+  PROCESSING = 'Processing',
+  PAYMENT_REQUESTED = 'Payment Requested',
+  PAYMENT_SUBMITTED = 'Payment Submitted',
+  DISPATCHED = 'Dispatched',
+  CANCELLED = 'Cancelled'
+}
+
+export interface User {
+  id: string;
+  username: string;
+  password?: string; // In real app, hashed. Here, plain for mock.
+  role: UserRole;
+  name: string;
+  isBlocked: boolean;
+}
+
+export interface CompanySettings {
+  name: string;
+  address: string;
+  phone: string;
+  logoUrl: string;
+  whatsappNumber: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+}
+
+export interface Banner {
+  id: string;
+  headline: string;
+  subheadline: string;
+  imageUrl: string;
+  buttonText?: string;
+  linkTo?: string; // 'critical-care', 'new', etc.
+  overlayColor: string;
+}
+
+export interface Product {
+  id: string;
+  brandName: string;
+  composition?: string; // Optional for Promotional Materials
+  division?: string; // Optional/Specific for Promotional
+  packing: string;
+  mrp: number; // Can be 0 for free items
+  stockStatus: StockStatus;
+  imageUrl: string;
+  visualAidUrl?: string; // Link to PDF or Image
+  videoUrl?: string;
+  landingCost?: number; // Internal only
+  isNewLaunch?: boolean; // Deprecated in favor of launchDate calculation
+  launchDate?: string; // ISO Format YYYY-MM-DD
+  isTrending?: boolean;
+  tags?: string[]; // AI Generated Keywords for semantic search
+  isPromotional?: boolean; // New Flag for Input Shop items
+}
+
+export interface CartItem extends Product {
+  quantity: number;
+}
+
+export interface FilterState {
+  searchQuery: string;
+  division: string;
+}
+
+export interface OrderHistoryItem {
+  orderDate: string;
+  productId: string;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  userName: string; // Denormalized for display
+  date: string; // ISO String
+  items: CartItem[];
+  status: OrderStatus;
+  totalInquiryValue: number; // Sum of MRP * Qty (Approx)
+  finalPayableAmount?: number; // Set by Staff
+  invoiceUrl?: string; // URL to PDF/Image
+  paymentProofUrl?: string; // URL to Screenshot
+  docketNumber?: string;
+  transportDetails?: string;
+}PK
+     HY=\n®T       constants.tsimport { Product, StockStatus, User, UserRole, Banner, CompanySettings, Order, OrderStatus } from './types';
+
+export const INITIAL_DIVISIONS = [
+  "All",
+  "Critical Care",
+  "Cardiac",
+  "Derma",
+  "General",
+  "Ortho",
+  "Pediatric",
+  "Marketing Inputs" // New Category
+];
+
+export const INITIAL_NEWS_TICKER = [
+  "üöÄ New Launch: CardioPlus 50mg is now available!",
+  "üì¶ Bulk Order Scheme: Flat 10% off on orders above $5000.",
+  "‚ö†Ô∏è Low Stock Alert: Please update your inventory for FluGo tablets.",
+  "üéÅ Order Complimentary Visual Aids from the new Input Shop!"
+];
+
+export const INITIAL_SETTINGS: CompanySettings = {
+    name: "Janus Biotech India Pvt Ltd",
+    address: "SCO 123, Sector 82, JLPL Industrial Area, Mohali, Punjab",
+    phone: "+91-9876543210",
+    logoUrl: "", // Empty defaults to icon
+    whatsappNumber: "919876543210"
+};
+
+export const INITIAL_USERS: User[] = [
+    { id: '1', username: 'admin', password: 'admin123', role: UserRole.ADMIN, name: 'Super Admin', isBlocked: false },
+    { id: '2', username: 'staff', password: 'staff123', role: UserRole.STAFF, name: 'Rahul Sharma', isBlocked: false },
+    { id: '3', username: 'distributor', password: 'user123', role: UserRole.CUSTOMER, name: 'MediCare Pharma', isBlocked: false },
+];
+
+export const INITIAL_BANNERS: Banner[] = [
+    {
+      id: '1',
+      headline: "Janus Biotech India Pvt. Ltd.",
+      subheadline: "Empowering Healthcare with 3300+ Products across 18 Specialty Divisions.",
+      imageUrl: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&w=1920&q=80",
+      overlayColor: "bg-[#0056b3]/70" 
+    },
+    {
+      id: '2',
+      headline: "Excellence in Critical Care",
+      subheadline: "Premium Injectables & Life-Saving Formulations for Monopoly Distribution.",
+      buttonText: "View Critical Care List",
+      linkTo: 'Critical Care',
+      imageUrl: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1920&q=80",
+      overlayColor: "bg-indigo-900/60"
+    },
+    {
+      id: '3',
+      headline: "New Input Shop Live!",
+      subheadline: "Order Visual Aids, MR Bags, and Gifts directly from the portal.",
+      buttonText: "Visit Input Shop",
+      linkTo: 'Input Shop',
+      imageUrl: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=1920&q=80",
+      overlayColor: "bg-emerald-900/60"
+    }
+];
+
+const today = new Date().toISOString().split('T')[0];
+const threeMonthsAgo = new Date();
+threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+const oldDate = threeMonthsAgo.toISOString().split('T')[0];
+
+export const INITIAL_PRODUCTS: Product[] = [
+  {
+    id: '1',
+    brandName: 'CardioSafe-10',
+    composition: 'Atorvastatin 10mg',
+    division: 'Cardiac',
+    packing: '10x10 Alu-Alu',
+    mrp: 120,
+    stockStatus: StockStatus.AVAILABLE,
+    imageUrl: 'https://picsum.photos/400/400?random=1',
+    visualAidUrl: '#',
+    landingCost: 45,
+    isTrending: true,
+    launchDate: oldDate,
+    tags: ['Cholesterol', 'Heart Health', 'Cardiac', 'Statin']
+  },
+  {
+    id: '2',
+    brandName: 'DermGlo Cream',
+    composition: 'Ketoconazole 2% + Zinc',
+    division: 'Derma',
+    packing: '20g Tube',
+    mrp: 85,
+    stockStatus: StockStatus.LOW_STOCK,
+    imageUrl: 'https://picsum.photos/400/400?random=2',
+    videoUrl: 'https://youtube.com',
+    landingCost: 25,
+    launchDate: today, // New Launch
+    isTrending: true,
+    tags: ['Fungal Infection', 'Skin', 'Cream', 'Itching']
+  },
+  {
+    id: '3',
+    brandName: 'OrthoFlex Gel',
+    composition: 'Diclofenac + Menthol',
+    division: 'Ortho',
+    packing: '30g Tube',
+    mrp: 110,
+    stockStatus: StockStatus.AVAILABLE,
+    imageUrl: 'https://picsum.photos/400/400?random=3',
+    landingCost: 30,
+    isTrending: false,
+    launchDate: oldDate,
+    tags: ['Pain Relief', 'Joint Pain', 'Muscle Pain', 'Gel']
+  },
+  {
+    id: '4',
+    brandName: 'CritInject 1g',
+    composition: 'Ceftriaxone 1g Injection',
+    division: 'Critical Care',
+    packing: '1 Vial + Water',
+    mrp: 65,
+    stockStatus: StockStatus.OUT_OF_STOCK,
+    imageUrl: 'https://picsum.photos/400/400?random=4',
+    landingCost: 22,
+    launchDate: oldDate,
+    tags: ['Antibiotic', 'Infection', 'Injection', 'Critical']
+  },
+  {
+    id: '5',
+    brandName: 'PediCough Syrup',
+    composition: 'Ambroxol + Levosalbutamol',
+    division: 'Pediatric',
+    packing: '100ml Bottle',
+    mrp: 95,
+    stockStatus: StockStatus.COMING_SOON,
+    imageUrl: 'https://picsum.photos/400/400?random=5',
+    landingCost: 35,
+    launchDate: today, // New Launch
+    tags: ['Cough', 'Cold', 'Kids', 'Syrup']
+  },
+  // Promotional Items
+  {
+    id: 'promo-1',
+    brandName: 'Visual Aid Folder (2024)',
+    isPromotional: true,
+    division: 'Marketing Inputs',
+    packing: '1 Unit',
+    mrp: 0,
+    stockStatus: StockStatus.AVAILABLE,
+    imageUrl: 'https://images.unsplash.com/photo-1586769852044-692d6e37d74e?auto=format&fit=crop&w=800&q=80',
+    tags: ['Marketing', 'Visual Aid', 'Folder', 'Input']
+  },
+  {
+    id: 'promo-2',
+    brandName: 'MR Reporting Bag (Leather)',
+    isPromotional: true,
+    division: 'Marketing Inputs',
+    packing: '1 Unit',
+    mrp: 850,
+    stockStatus: StockStatus.AVAILABLE,
+    imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=800&q=80',
+    tags: ['Bag', 'MR Bag', 'Gift', 'Input']
+  },
+  {
+    id: 'promo-3',
+    brandName: 'Janus Prescription Pads',
+    isPromotional: true,
+    division: 'Marketing Inputs',
+    packing: 'Pack of 10',
+    mrp: 0,
+    stockStatus: StockStatus.AVAILABLE,
+    imageUrl: 'https://images.unsplash.com/photo-1583521214690-73421a1829a9?auto=format&fit=crop&w=800&q=80',
+    tags: ['Stationery', 'Prescription', 'Input']
+  }
+];
+
+export const INITIAL_ORDERS: Order[] = [
+    {
+        id: 'ORD-1001',
+        userId: '3',
+        userName: 'MediCare Pharma',
+        date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        status: OrderStatus.DISPATCHED,
+        totalInquiryValue: 12000,
+        finalPayableAmount: 11500,
+        docketNumber: 'DTDC-99887766',
+        items: [
+            {...INITIAL_PRODUCTS[0], quantity: 50},
+            {...INITIAL_PRODUCTS[2], quantity: 20}
+        ]
+    },
+    {
+        id: 'ORD-1002',
+        userId: '3',
+        userName: 'MediCare Pharma',
+        date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        status: OrderStatus.PAYMENT_REQUESTED,
+        totalInquiryValue: 8500,
+        finalPayableAmount: 8200,
+        invoiceUrl: '#', // In real app, this is a link
+        items: [
+            {...INITIAL_PRODUCTS[1], quantity: 100}
+        ]
+    }
+];PK
+     HY=\            	   services/PK
+     HY=\≥(>HV  V     services/geminiService.tsimport { GoogleGenAI } from "@google/genai";
+import { Product } from "../types";
+
+const apiKey = process.env.API_KEY || '';
+
+// Initialize the Gemini AI client
+let ai: GoogleGenAI | null = null;
+if (apiKey) {
+    ai = new GoogleGenAI({ apiKey });
+}
+
+export const analyzeProductQuery = async (query: string, productCatalog: Product[]): Promise<string> => {
+    if (!ai) {
+        return "AI Assistant is unavailable (Missing API Key).";
+    }
+
+    try {
+        // Create a lightweight context of the catalog for the AI
+        const catalogContext = productCatalog.map(p => 
+            `- ${p.brandName} ${p.composition ? `(${p.composition})` : ''}: ${p.division || 'General'}, Stock: ${p.stockStatus}, Tags: ${p.tags?.join(', ')}`
+        ).join('\n');
+
+        const prompt = `
+        You are a smart pharma assistant for a B2B ordering portal.
+        
+        User Query: "${query}"
+
+        Here is the available Product Catalog:
+        ${catalogContext}
+
+        Task:
+        1. Identify which products from the catalog match the user's need (symptoms, generic name, brand, or medical context).
+        2. Provide a brief, professional recommendation list based strictly on the catalog above.
+        3. If no product matches, politely say so.
+        4. Keep the response short (under 50 words) and sales-oriented.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview',
+            contents: prompt,
+        });
+
+        return response.text || "I couldn't generate a response.";
+    } catch (error) {
+        console.error("Gemini API Error:", error);
+        return "Sorry, I encountered an error processing your request.";
+    }
+};
+
+export const generateMarketingCaption = async (product: Product): Promise<string> => {
+    if (!ai) return "AI Service Unavailable";
+
+    try {
+        const compText = product.composition ? `composed of "${product.composition}"` : "";
+        const prompt = `Write a short, professional, and catchy sales message (max 40 words) for a pharmaceutical distributor to share on WhatsApp about the product: "${product.brandName}" ${compText}. Mention it is available at Janus Biotech. Add appropriate emojis.`;
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview',
+            contents: prompt,
+        });
+        return response.text || "";
+    } catch (e) {
+        console.error(e);
+        return "Error generating caption.";
+    }
+}
+
+export const askAdminAssistant = async (query: string, contextData: string): Promise<string> => {
+    if (!ai) return "AI is not configured.";
+    
+    try {
+        const prompt = `
+        You are an intelligent Admin Assistant for a Pharma Company. 
+        Current Data Context: ${contextData}
+        
+        Admin Query: ${query}
+        
+        Provide a professional, analytical, or creative response to help the admin.
+        `;
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview',
+            contents: prompt,
+        });
+        return response.text || "No response generated.";
+    } catch (e) {
+        return "Error connecting to AI.";
+    }
+}
+
+export const generateProductTags = async (brandName: string, composition?: string): Promise<string[]> => {
+    if (!ai) return [];
+    try {
+        const prompt = `
+        Generate 5-7 relevant search tags for the item: "${brandName}" ${composition ? `which contains "${composition}"` : ''}.
+        Include: Common symptoms it treats (if medicine), Category (e.g. Antibiotic, Gift, Bag), and alternative common names.
+        Return ONLY a comma-separated list of keywords. No explanations.
+        Example Output: Acidity, Gastritis, Stomach Pain, PPI, Pantoprazole
+        `;
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview',
+            contents: prompt,
+        });
+        
+        const text = response.text || "";
+        return text.split(',').map(tag => tag.trim()).filter(t => t.length > 0);
+    } catch (e) {
+        console.error("Tag Generation Error", e);
+        return [];
+    }
+}
+
+export const identifyProductFromImage = async (base64Image: string, productCatalog: Product[]): Promise<string> => {
+    if (!ai) return "";
+
+    try {
+         // Create a context of valid product names to help the AI match
+         const productNames = productCatalog.map(p => `${p.brandName} ${p.composition ? `(${p.composition})` : ''}`).join(', ');
+
+         const prompt = `
+         Analyze this image of a medicine or product. 
+         1. Read the brand name or text from the package.
+         2. Check if it matches or is very similar to any product in this list: [${productNames}].
+         3. If a match is found, return ONLY the Brand Name from the list.
+         4. If no exact match is found, return the most prominent text (Brand or Composition) found on the image.
+         `;
+
+         const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: 'image/jpeg', data: base64Image.split(',')[1] } },
+                    { text: prompt }
+                ]
+            }
+        });
+
+        return response.text?.trim() || "";
+    } catch (e) {
+        console.error("Visual Search Error", e);
+        return "";
+    }
+}PK
+     HY=\            
+   components/PK
+     HY=\e4†®-  ®-     components/Layout.tsximport React, { useState } from 'react';
+import { ShoppingCart, Menu, Phone, Package, Heart, Search, Settings, PlusCircle, Edit, MessageSquare, MonitorPlay, LogOut, User as UserIcon, ClipboardList, Gift } from 'lucide-react';
+import { UserRole, User, CompanySettings } from '../types';
+
+interface LayoutProps {
+  children?: React.ReactNode;
+  userRole: UserRole;
+  user: User | null;
+  companySettings: CompanySettings;
+  cartCount: number;
+  wishlistCount: number;
+  compareCount: number;
+  presentationCount: number;
+  onLogout: () => void;
+  onCartClick: () => void;
+  onPresentationClick: () => void;
+  currentPage: string;
+  onNavigate: (page: string) => void;
+}
+
+export const NewsTicker: React.FC<{items: string[]}> = ({ items }) => {
+  return (
+    <div className="bg-blue-900 text-white text-sm py-2 overflow-hidden relative">
+      <div className="animate-marquee whitespace-nowrap">
+        {items.map((item, index) => (
+          <span key={index} className="mx-8 inline-block">‚Ä¢ {item}</span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const Header: React.FC<LayoutProps> = ({ 
+  userRole, 
+  user,
+  companySettings,
+  cartCount,
+  wishlistCount,
+  compareCount,
+  presentationCount,
+  onLogout, 
+  onCartClick,
+  onPresentationClick,
+  onNavigate,
+  currentPage 
+}) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(false);
+
+  return (
+    <header className="bg-white shadow-sm sticky top-0 z-50">
+      {/* Top Utility Bar */}
+      <div className="bg-slate-100 px-4 py-1 flex justify-between items-center text-xs text-slate-500">
+        <div className="flex items-center gap-2">
+          <Phone size={12} /> Support: {companySettings.phone}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden md:inline">Logged in as:</span>
+          <span className="font-bold text-blue-800">{user?.name} ({userRole})</span>
+          <button onClick={onLogout} className="ml-2 text-red-500 hover:underline flex items-center gap-1">
+             <LogOut size={10} /> Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Main Header */}
+      <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+        {/* Logo Section */}
+        <div className="flex items-center gap-2 cursor-pointer flex-1 min-w-0 mr-2" onClick={() => onNavigate('dashboard')}>
+          {companySettings.logoUrl ? (
+             <img src={companySettings.logoUrl} alt="Logo" className="h-10 object-contain" />
+          ) : (
+            <div className="bg-blue-600 text-white p-1.5 md:p-2 rounded-lg flex-shrink-0">
+                <Package size={20} className="md:w-6 md:h-6" />
+            </div>
+          )}
+          <div className="min-w-0 overflow-hidden">
+            <h1 className="text-base md:text-xl font-bold text-blue-900 leading-none font-nexa tracking-tight truncate">{companySettings.name}</h1>
+            <span className="text-[10px] md:text-xs text-slate-500 font-medium whitespace-nowrap">Franchise Portal</span>
+          </div>
+        </div>
+
+        {/* Desktop Nav */}
+        <nav className="hidden lg:flex items-center gap-6 mr-6">
+          <button 
+            onClick={() => onNavigate('dashboard')} 
+            className={`font-medium ${currentPage === 'dashboard' ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'}`}
+          >
+            Dashboard
+          </button>
+          <button 
+            onClick={() => onNavigate('catalog')} 
+            className={`font-medium ${currentPage === 'catalog' ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'}`}
+          >
+            Product Library
+          </button>
+           <button 
+            onClick={() => onNavigate('Input Shop')} 
+            className={`font-medium flex items-center gap-1 ${currentPage === 'Input Shop' ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'}`}
+          >
+             <Gift size={16} /> Input Shop
+          </button>
+          <button 
+            onClick={() => onNavigate('orders')} 
+            className={`font-medium flex items-center gap-1 ${currentPage === 'orders' ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'}`}
+          >
+            {userRole === UserRole.CUSTOMER ? 'My Orders' : 'Manage Orders'}
+          </button>
+          
+          <button 
+            onClick={onPresentationClick} 
+            className="font-medium text-slate-600 hover:text-blue-600 flex items-center gap-1"
+            title="Presentation Mode"
+          >
+            Presentation 
+            {presentationCount > 0 && <span className="bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 rounded-full">{presentationCount}</span>}
+          </button>
+
+          {userRole === UserRole.CUSTOMER && (
+            <>
+              <button 
+                onClick={() => onNavigate('wishlist')} 
+                className={`font-medium flex items-center gap-1 ${currentPage === 'wishlist' ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'}`}
+              >
+                Wishlist 
+                {wishlistCount > 0 && <span className="bg-pink-100 text-pink-600 text-[10px] font-bold px-1.5 rounded-full">{wishlistCount}</span>}
+              </button>
+              <button 
+                onClick={() => onNavigate('compare')} 
+                className={`font-medium flex items-center gap-1 ${currentPage === 'compare' ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'}`}
+              >
+                Compare
+                {compareCount > 0 && <span className="bg-purple-100 text-purple-600 text-[10px] font-bold px-1.5 rounded-full">{compareCount}</span>}
+              </button>
+            </>
+          )}
+          {userRole === UserRole.ADMIN && (
+            <div className="relative">
+                <button 
+                  onClick={() => setIsAdminDropdownOpen(!isAdminDropdownOpen)}
+                  className={`font-medium flex items-center gap-1 ${currentPage === 'admin' ? 'text-blue-600' : 'text-slate-600 hover:text-blue-600'}`}
+                >
+                  Admin Panel <Settings size={16} />
+                </button>
+                {isAdminDropdownOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-slate-100 shadow-xl rounded-xl overflow-hidden z-50">
+                        <button onClick={() => {onNavigate('admin'); setIsAdminDropdownOpen(false)}} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <PlusCircle size={16} /> Add Product
+                        </button>
+                        <button onClick={() => {onNavigate('admin'); setIsAdminDropdownOpen(false)}} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <Edit size={16} /> Manage Content
+                        </button>
+                        <button onClick={() => {onNavigate('admin'); setIsAdminDropdownOpen(false)}} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <UserIcon size={16} /> Manage Users
+                        </button>
+                    </div>
+                )}
+            </div>
+          )}
+        </nav>
+
+        {/* Actions Group */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button 
+            onClick={() => onNavigate('catalog')}
+            className="p-2 hover:bg-slate-100 rounded-full transition text-slate-700"
+            title="Search Products"
+          >
+            <Search size={20} className="md:w-6 md:h-6" />
+          </button>
+
+          {/* Mobile Only Nav Icons */}
+          {userRole === UserRole.CUSTOMER && (
+             <div className="flex lg:hidden gap-1">
+                <button onClick={() => onNavigate('wishlist')} className="relative p-2">
+                  <Heart size={20} className={currentPage === 'wishlist' ? 'text-blue-600 fill-current' : 'text-slate-700'} />
+                </button>
+             </div>
+          )}
+
+          <button className="relative p-2 hover:bg-slate-100 rounded-full transition" onClick={onCartClick}>
+            <ShoppingCart size={20} className="md:w-6 md:h-6 text-slate-700" />
+            {cartCount > 0 && (
+              <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 md:w-5 md:h-5 flex items-center justify-center rounded-full border-2 border-white">
+                {cartCount}
+              </span>
+            )}
+          </button>
+          
+          <button className="lg:hidden p-2 ml-1" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            <Menu size={24} className="text-slate-700" />
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <div className="lg:hidden bg-white border-t p-4 flex flex-col gap-4 shadow-lg absolute w-full z-40 animate-in slide-in-from-top-5">
+           <button 
+            onClick={() => { onNavigate('dashboard'); setIsMenuOpen(false); }} 
+            className="text-left font-medium text-slate-700"
+          >
+            Dashboard
+          </button>
+          <button 
+            onClick={() => { onNavigate('catalog'); setIsMenuOpen(false); }} 
+            className="text-left font-medium text-slate-700"
+          >
+            Product Library
+          </button>
+           <button 
+            onClick={() => { onNavigate('Input Shop'); setIsMenuOpen(false); }} 
+            className="text-left font-medium text-slate-700 flex items-center gap-2"
+          >
+            Input Shop <Gift size={16} />
+          </button>
+          <button 
+            onClick={() => { onNavigate('orders'); setIsMenuOpen(false); }} 
+            className="text-left font-medium text-slate-700 flex items-center gap-2"
+          >
+            {userRole === UserRole.CUSTOMER ? 'My Orders' : 'Manage Orders'} <ClipboardList size={16} />
+          </button>
+          
+          <button 
+            onClick={() => { onPresentationClick(); setIsMenuOpen(false); }} 
+            className="text-left font-medium text-slate-700 flex justify-between items-center"
+          >
+             Presentation Mode <MonitorPlay size={16} />
+          </button>
+
+          {userRole === UserRole.CUSTOMER && (
+            <>
+              <button 
+                onClick={() => { onNavigate('wishlist'); setIsMenuOpen(false); }} 
+                className="text-left font-medium text-slate-700 flex justify-between"
+              >
+                My Wishlist <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{wishlistCount}</span>
+              </button>
+              <button 
+                onClick={() => { onNavigate('compare'); setIsMenuOpen(false); }} 
+                className="text-left font-medium text-slate-700 flex justify-between"
+              >
+                Compare Products <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{compareCount}</span>
+              </button>
+            </>
+          )}
+          {userRole === UserRole.ADMIN && (
+             <button 
+              onClick={() => { onNavigate('admin'); setIsMenuOpen(false); }} 
+              className="text-left font-medium text-slate-700"
+            >
+              Admin Panel
+            </button>
+          )}
+          <button onClick={onLogout} className="text-left font-medium text-red-500 flex items-center gap-2 pt-2 border-t">
+              <LogOut size={16} /> Logout
+          </button>
+        </div>
+      )}
+    </header>
+  );
+};PK
+     HY=\∆PaR2  R2     components/ProductCard.tsximport React, { useState } from 'react';
+import { Share2, ShoppingBag, Eye, FileText, Video, Heart, Scale, MonitorPlay, RefreshCw, Flame, Sparkles, Wand2, Copy, Check, Edit2, Gift } from 'lucide-react';
+import { Product, UserRole, StockStatus } from '../types';
+import { generateMarketingCaption } from '../services/geminiService';
+
+interface ProductCardProps {
+  product: Product;
+  userRole: UserRole;
+  isWishlisted?: boolean;
+  isCompared?: boolean;
+  isPresented?: boolean;
+  onAddToCart: (product: Product) => void;
+  onToggleWishlist?: (product: Product) => void;
+  onToggleCompare?: (product: Product) => void;
+  onTogglePresentation?: (product: Product) => void;
+  onFindSubstitutes?: (composition: string) => void;
+  onEditProduct?: (product: Product) => void;
+}
+
+const getStockBadgeColor = (status: StockStatus) => {
+  switch (status) {
+    case StockStatus.AVAILABLE: return 'bg-green-100 text-green-700 border-green-200';
+    case StockStatus.LOW_STOCK: return 'bg-amber-100 text-amber-700 border-amber-200';
+    case StockStatus.COMING_SOON: return 'bg-blue-100 text-blue-700 border-blue-200';
+    case StockStatus.OUT_OF_STOCK: return 'bg-red-100 text-red-700 border-red-200';
+    default: return 'bg-gray-100 text-gray-700';
+  }
+};
+
+const isNewLaunch = (dateString?: string) => {
+    if (!dateString) return false;
+    const launch = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - launch.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 60;
+  };
+
+export const ProductCard: React.FC<ProductCardProps> = ({ 
+  product, 
+  userRole, 
+  onAddToCart,
+  isWishlisted = false,
+  isCompared = false,
+  isPresented = false,
+  onToggleWishlist,
+  onToggleCompare,
+  onTogglePresentation,
+  onFindSubstitutes,
+  onEditProduct
+}) => {
+  const [showCaptionModal, setShowCaptionModal] = useState(false);
+  const [generatedCaption, setGeneratedCaption] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
+  const handleShare = () => {
+    const text = `Check out this product:\n*${product.brandName}*\n${product.composition ? `Composition: ${product.composition}\n` : ''}MRP: ${product.mrp === 0 ? 'Free/Complimentary' : product.mrp}\nPacking: ${product.packing}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleGenerateCaption = async () => {
+      setShowCaptionModal(true);
+      if (!generatedCaption) {
+          setIsGenerating(true);
+          const caption = await generateMarketingCaption(product);
+          setGeneratedCaption(caption);
+          setIsGenerating(false);
+      }
+  };
+
+  const copyToClipboard = () => {
+      navigator.clipboard.writeText(generatedCaption);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  };
+
+  const isNew = isNewLaunch(product.launchDate);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md transition duration-200 relative group">
+      <div className="relative aspect-square bg-slate-100 overflow-hidden">
+        <img 
+          src={product.imageUrl} 
+          alt={product.brandName} 
+          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+        />
+        <div className="absolute top-2 right-2 flex flex-col items-end gap-2 z-10">
+           <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${getStockBadgeColor(product.stockStatus)}`}>
+            {product.stockStatus}
+          </span>
+        </div>
+        
+        {/* Customer Actions Overlay & Badges */}
+        <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
+            {isNew && (
+                <div className="bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1">
+                    <Sparkles size={10} /> NEW
+                </div>
+            )}
+            {product.isTrending && (
+                <div className="bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1">
+                    <Flame size={10} /> HOT
+                </div>
+            )}
+            {product.isPromotional && (
+                 <div className="bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1">
+                    <Gift size={10} /> PROMO
+                 </div>
+            )}
+        </div>
+
+        {/* Admin Edit Overlay Button (visible on hover) */}
+        {userRole === UserRole.ADMIN && onEditProduct && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 z-20">
+                <button 
+                    onClick={() => onEditProduct(product)}
+                    className="bg-white text-slate-800 font-bold py-2 px-4 rounded-full flex items-center gap-2 hover:bg-blue-50 transition transform hover:scale-105"
+                >
+                    <Edit2 size={16} /> Edit Product
+                </button>
+            </div>
+        )}
+      </div>
+
+      <div className="p-4 flex flex-col flex-grow">
+        <div className="flex justify-between items-start mb-1">
+            <div>
+                 <span className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">{product.division || 'Input'}</span>
+                 <h3 className="font-bold text-slate-800 text-lg leading-tight">{product.brandName}</h3>
+            </div>
+            <div className="text-right">
+                {product.mrp === 0 ? (
+                    <span className="block text-sm font-bold text-green-600 whitespace-nowrap">Free / Gift</span>
+                ) : (
+                    <span className="block text-lg font-bold text-blue-600">‚Çπ{product.mrp}</span>
+                )}
+                {product.mrp > 0 && <span className="text-[10px] text-slate-400">MRP</span>}
+            </div>
+        </div>
+        
+        {product.composition ? (
+            <p className="text-sm text-slate-600 mb-2">{product.composition}</p>
+        ) : (
+            <p className="text-sm text-slate-400 italic mb-2">Promotional Material</p>
+        )}
+        
+        <p className="text-xs text-slate-400 mb-4 bg-slate-50 inline-block px-2 py-1 rounded">Packing: {product.packing}</p>
+
+        {/* Tags Display (Semantic Context) */}
+        {product.tags && product.tags.length > 0 && (
+             <div className="flex flex-wrap gap-1 mb-3">
+                 {product.tags.slice(0, 3).map(tag => (
+                     <span key={tag} className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{tag}</span>
+                 ))}
+             </div>
+        )}
+
+        {/* Internal Data - Only for Admin/Staff */}
+        {(userRole === UserRole.ADMIN || userRole === UserRole.STAFF) && (
+          <div className="mb-4 p-2 bg-yellow-50 border border-yellow-100 rounded text-xs text-yellow-800">
+            <p><strong>Internal:</strong> Landing Cost: ‚Çπ{product.landingCost}</p>
+            {product.launchDate && <p className="mt-1 text-[10px]">Launch: {product.launchDate}</p>}
+          </div>
+        )}
+
+        <div className="mt-auto flex flex-col gap-2">
+           <div className="flex gap-2">
+                {product.visualAidUrl && (
+                    <button className="flex-1 py-1.5 flex items-center justify-center gap-1 text-xs border border-slate-200 rounded text-slate-600 hover:bg-slate-50">
+                        <FileText size={14} /> Visual Aid
+                    </button>
+                )}
+                {product.videoUrl && (
+                    <button className="flex-1 py-1.5 flex items-center justify-center gap-1 text-xs border border-slate-200 rounded text-slate-600 hover:bg-slate-50">
+                        <Video size={14} /> Video
+                    </button>
+                )}
+           </div>
+
+           <div className="flex gap-2 mt-2">
+             <button 
+               onClick={handleShare}
+               className="bg-green-50 text-green-600 p-2 rounded-lg border border-green-200 hover:bg-green-100 transition"
+               title="Share on WhatsApp"
+             >
+               <Share2 size={20} />
+             </button>
+             
+             {/* AI Caption Generator Button */}
+             <button 
+               onClick={handleGenerateCaption}
+               className="bg-purple-50 text-purple-600 p-2 rounded-lg border border-purple-200 hover:bg-purple-100 transition relative"
+               title="Generate Marketing Caption"
+             >
+               <Wand2 size={20} />
+             </button>
+
+             {/* Caption Modal Popover */}
+             {showCaptionModal && (
+                 <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-purple-100 p-3 z-50 animate-in slide-in-from-bottom-2">
+                     <div className="flex justify-between items-center mb-2">
+                         <h5 className="text-xs font-bold text-purple-800 flex items-center gap-1"><Sparkles size={12}/> AI Marketing Copy</h5>
+                         <button onClick={(e) => {e.stopPropagation(); setShowCaptionModal(false)}} className="text-slate-400 hover:text-red-500"><X size={14} /></button>
+                     </div>
+                     {isGenerating ? (
+                         <div className="text-center py-4 text-xs text-slate-500">Thinking...</div>
+                     ) : (
+                         <>
+                            <p className="text-xs text-slate-600 italic mb-3 leading-relaxed">"{generatedCaption}"</p>
+                            <button onClick={(e) => {e.stopPropagation(); copyToClipboard()}} className="w-full py-1.5 bg-purple-600 text-white text-xs rounded-lg font-bold flex items-center justify-center gap-1 hover:bg-purple-700">
+                                {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? 'Copied!' : 'Copy Text'}
+                            </button>
+                         </>
+                     )}
+                 </div>
+             )}
+             
+             {onTogglePresentation && (
+                <button 
+                  onClick={() => onTogglePresentation(product)}
+                  className={`p-2 rounded-lg border transition ${isPresented ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-blue-50 hover:text-blue-400'}`}
+                  title="Add to Presentation"
+                >
+                  <MonitorPlay size={20} />
+                </button>
+             )}
+
+             {userRole === UserRole.CUSTOMER && onToggleWishlist && (
+                 <button 
+                   onClick={() => onToggleWishlist(product)}
+                   className={`p-2 rounded-lg border transition ${isWishlisted ? 'bg-pink-50 text-pink-500 border-pink-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-pink-50 hover:text-pink-400'}`}
+                   title="Add to Wishlist"
+                 >
+                   <Heart size={20} fill={isWishlisted ? "currentColor" : "none"} />
+                 </button>
+             )}
+             
+             {userRole === UserRole.CUSTOMER && (
+                <>
+                {product.stockStatus === StockStatus.OUT_OF_STOCK ? (
+                     <button 
+                        onClick={() => onFindSubstitutes && onFindSubstitutes(product.composition || '')}
+                        disabled={!product.composition}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 transition disabled:opacity-50"
+                     >
+                         <RefreshCw size={18} /> Substitutes
+                     </button>
+                ) : (
+                    <button 
+                        onClick={() => onAddToCart(product)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-sm bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200"
+                    >
+                        <ShoppingBag size={18} />
+                        Order
+                    </button>
+                )}
+                </>
+             )}
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Helper Icon for Modal
+const X = ({size}: {size:number}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+);PK
+     HY=\               pages/PK
+     HY=\}•;b(  b(     pages/Catalog.tsximport React, { useState, useEffect, useRef } from 'react';
+import { Search, Sparkles, Filter, X, Mic, MicOff, Camera, Loader, Gift } from 'lucide-react';
+import { Product, UserRole } from '../types';
+import { ProductCard } from '../components/ProductCard';
+import { analyzeProductQuery, identifyProductFromImage } from '../services/geminiService';
+
+interface CatalogProps {
+  products: Product[];
+  divisions: string[];
+  userRole: UserRole;
+  onAddToCart: (product: Product) => void;
+  wishlistIds: string[];
+  compareListIds: string[];
+  presentationListIds: string[];
+  onToggleWishlist: (product: Product) => void;
+  onToggleCompare: (product: Product) => void;
+  onTogglePresentation: (product: Product) => void;
+  initialDivision?: string;
+  onEditProduct?: (product: Product) => void;
+}
+
+export const Catalog: React.FC<CatalogProps> = ({ 
+  products, 
+  divisions,
+  userRole, 
+  onAddToCart,
+  wishlistIds,
+  compareListIds,
+  presentationListIds,
+  onToggleWishlist,
+  onToggleCompare,
+  onTogglePresentation,
+  initialDivision,
+  onEditProduct
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDivision, setSelectedDivision] = useState(initialDivision || 'All');
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isVisualSearching, setIsVisualSearching] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialDivision) {
+        setSelectedDivision(initialDivision);
+    }
+  }, [initialDivision]);
+
+  // Web Speech API
+  const startListening = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert("Your browser does not support voice search.");
+      return;
+    }
+    
+    // @ts-ignore
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setSearchQuery(transcript);
+    };
+
+    recognition.start();
+  };
+
+  const handleVisualSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          setIsVisualSearching(true);
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+              const base64 = reader.result as string;
+              const match = await identifyProductFromImage(base64, products);
+              if (match) {
+                  setSearchQuery(match);
+              } else {
+                  alert("Could not identify product in image.");
+              }
+              setIsVisualSearching(false);
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
+  const handleFindSubstitutes = (composition: string) => {
+    setSearchQuery(composition);
+    setSelectedDivision('All');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Filter logic including Semantic Tags
+  const filteredProducts = products.filter(product => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = 
+      product.brandName.toLowerCase().includes(q) || 
+      (product.composition && product.composition.toLowerCase().includes(q)) ||
+      product.tags?.some(tag => tag.toLowerCase().includes(q));
+    
+    const matchesDivision = selectedDivision === 'All' || product.division === selectedDivision;
+
+    return matchesSearch && matchesDivision;
+  });
+
+  const handleAiSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setIsAiLoading(true);
+    setAiResponse(null);
+    
+    const result = await analyzeProductQuery(searchQuery, products);
+    setAiResponse(result);
+    setIsAiLoading(false);
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-6">
+      
+      {/* Search & AI Header */}
+      <div className="mb-8 bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-6 md:p-10 text-white shadow-xl">
+        <h2 className="text-2xl md:text-3xl font-bold mb-4">Product Library</h2>
+        <div className="relative max-w-2xl">
+          <input
+            type="text"
+            placeholder="Search Brand, Composition, Symptoms (e.g. 'Acidity') or ask AI..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-12 pr-40 py-4 rounded-xl text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-400/30 shadow-lg"
+          />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+             <button 
+                onClick={() => fileInputRef.current?.click()}
+                className={`p-2 rounded-lg transition text-slate-400 hover:text-slate-600 ${isVisualSearching ? 'animate-pulse text-blue-500' : ''}`}
+                title="Visual Search (Camera)"
+                disabled={isVisualSearching}
+            >
+                {isVisualSearching ? <Loader size={20} className="animate-spin" /> : <Camera size={20} />}
+            </button>
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleVisualSearch} />
+
+            <button 
+                onClick={startListening}
+                className={`p-2 rounded-lg transition ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:text-slate-600'}`}
+                title="Voice Search"
+            >
+                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+            </button>
+            <button 
+                onClick={handleAiSearch}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ml-2"
+            >
+                <Sparkles size={16} />
+                {isAiLoading ? 'Thinking...' : 'AI Help'}
+            </button>
+          </div>
+        </div>
+
+        {/* AI Response Area */}
+        {aiResponse && (
+          <div className="mt-4 bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl animate-in fade-in slide-in-from-top-2">
+            <div className="flex justify-between items-start">
+               <div className="flex gap-2">
+                   <Sparkles className="text-yellow-300 mt-1 shrink-0" size={16} />
+                   <p className="text-sm md:text-base leading-relaxed">{aiResponse}</p>
+               </div>
+               <button onClick={() => setAiResponse(null)} className="text-white/70 hover:text-white"><X size={16}/></button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* Sidebar Filters */}
+        <aside className="w-full md:w-64 flex-shrink-0">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 sticky top-24">
+            <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold">
+              <Filter size={18} />
+              <h3>Filters</h3>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Divisions</p>
+              {divisions.map(div => (
+                <button
+                  key={div}
+                  onClick={() => setSelectedDivision(div)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${
+                    selectedDivision === div 
+                      ? 'bg-blue-50 text-blue-700 font-medium' 
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {div}
+                  {div === "Marketing Inputs" && <Gift size={14} className="text-purple-500" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* Product Grid */}
+        <div className="flex-1">
+          <div className="flex justify-between items-center mb-4">
+             <p className="text-slate-500 text-sm">Showing <strong>{filteredProducts.length}</strong> products</p>
+             {searchQuery && (
+                 <button onClick={() => setSearchQuery('')} className="text-xs text-red-500 hover:underline flex items-center gap-1">
+                     <X size={12} /> Clear Search
+                 </button>
+             )}
+          </div>
+
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredProducts.map(product => (
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  userRole={userRole}
+                  onAddToCart={onAddToCart}
+                  isWishlisted={wishlistIds.includes(product.id)}
+                  onToggleWishlist={onToggleWishlist}
+                  isCompared={compareListIds.includes(product.id)}
+                  onToggleCompare={onToggleCompare}
+                  isPresented={presentationListIds.includes(product.id)}
+                  onTogglePresentation={onTogglePresentation}
+                  onFindSubstitutes={handleFindSubstitutes}
+                  onEditProduct={onEditProduct}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20 bg-white rounded-xl border border-slate-100 border-dashed">
+                <Search size={48} className="mx-auto text-slate-300 mb-4" />
+                <h3 className="text-lg font-medium text-slate-700">No products found</h3>
+                <p className="text-slate-500">Try adjusting your search or filters.</p>
+                {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="mt-4 text-blue-600 font-bold">Clear Search</button>
+                )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};PK
+     HY=\\Gzàå&  å&     pages/Dashboard.tsximport React, { useMemo } from 'react';
+import { ArrowRight, TrendingUp, Zap, PlusCircle, Edit, MessageSquare, Clock } from 'lucide-react';
+import { Product, UserRole, OrderHistoryItem, Banner } from '../types';
+import { ProductCard } from '../components/ProductCard';
+import { HeroCarousel } from '../components/HeroCarousel';
+
+// Mock Order History for Logic Demo
+const MOCK_ORDER_HISTORY: OrderHistoryItem[] = [
+    { orderDate: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(), productId: '1', quantity: 10 }, 
+    { orderDate: new Date(Date.now() - 65 * 24 * 60 * 60 * 1000).toISOString(), productId: '1', quantity: 10 }, 
+];
+
+interface DashboardProps {
+  products: Product[];
+  banners: Banner[];
+  userRole: UserRole;
+  onAddToCart: (product: Product) => void;
+  onViewAll: () => void;
+  wishlistIds: string[];
+  compareListIds: string[];
+  onToggleWishlist: (product: Product) => void;
+  onToggleCompare: (product: Product) => void;
+  onNavigateToCriticalCare: () => void;
+  onNavigateToNewLaunches: () => void;
+  onNavigateToAdmin: () => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ 
+  products, 
+  banners,
+  userRole, 
+  onAddToCart, 
+  onViewAll,
+  wishlistIds,
+  compareListIds,
+  onToggleWishlist,
+  onToggleCompare,
+  onNavigateToCriticalCare,
+  onNavigateToNewLaunches,
+  onNavigateToAdmin
+}) => {
+  const isNew = (dateString?: string) => {
+    if (!dateString) return false;
+    const launch = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - launch.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 60;
+  };
+
+  const newLaunches = products.filter(p => isNew(p.launchDate)).sort((a,b) => (b.launchDate || '').localeCompare(a.launchDate || ''));
+  const trending = products.filter(p => p.isTrending);
+
+  // Predictive Restock Logic
+  const restockSuggestions = useMemo(() => {
+    if (userRole !== UserRole.CUSTOMER) return [];
+    const productOrders: Record<string, number[]> = {};
+    MOCK_ORDER_HISTORY.forEach(item => {
+        if (!productOrders[item.productId]) productOrders[item.productId] = [];
+        productOrders[item.productId].push(new Date(item.orderDate).getTime());
+    });
+    const suggestions: Product[] = [];
+    Object.keys(productOrders).forEach(pid => {
+        const dates = productOrders[pid].sort((a,b) => b - a);
+        if (dates.length < 2) return; 
+        let totalGap = 0;
+        for(let i = 0; i < dates.length - 1; i++) {
+            totalGap += (dates[i] - dates[i+1]);
+        }
+        const avgGap = totalGap / (dates.length - 1);
+        const lastOrderTime = dates[0];
+        const timeSinceLastOrder = Date.now() - lastOrderTime;
+        if (timeSinceLastOrder > avgGap) {
+            const product = products.find(p => p.id === pid);
+            if (product) suggestions.push(product);
+        }
+    });
+    return suggestions;
+  }, [products, userRole]);
+
+  return (
+    <div className="container mx-auto px-4 py-8 space-y-12">
+      
+      {/* Hero Banner Carousel */}
+      <HeroCarousel 
+        banners={banners}
+        onNavigateToCriticalCare={onNavigateToCriticalCare}
+        onNavigateToNewLaunches={onNavigateToNewLaunches}
+      />
+
+      {/* Admin Quick Actions */}
+      {userRole === UserRole.ADMIN && (
+        <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+           <h3 className="text-lg font-bold text-slate-800 mb-4">Admin Quick Actions</h3>
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button onClick={onNavigateToAdmin} className="p-4 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center gap-4 transition group">
+                 <div className="bg-blue-600 text-white p-3 rounded-full shadow-lg shadow-blue-200 group-hover:scale-110 transition">
+                    <PlusCircle size={24} />
+                 </div>
+                 <div className="text-left">
+                    <h4 className="font-bold text-slate-800">Add Product</h4>
+                    <p className="text-xs text-slate-500">Launch new item</p>
+                 </div>
+              </button>
+              <button onClick={onNavigateToAdmin} className="p-4 bg-amber-50 hover:bg-amber-100 rounded-xl flex items-center gap-4 transition group">
+                 <div className="bg-amber-500 text-white p-3 rounded-full shadow-lg shadow-amber-200 group-hover:scale-110 transition">
+                    <Edit size={24} />
+                 </div>
+                 <div className="text-left">
+                    <h4 className="font-bold text-slate-800">Update Details</h4>
+                    <p className="text-xs text-slate-500">Edit price, stock</p>
+                 </div>
+              </button>
+              <button onClick={onNavigateToAdmin} className="p-4 bg-purple-50 hover:bg-purple-100 rounded-xl flex items-center gap-4 transition group">
+                 <div className="bg-purple-500 text-white p-3 rounded-full shadow-lg shadow-purple-200 group-hover:scale-110 transition">
+                    <MessageSquare size={24} />
+                 </div>
+                 <div className="text-left">
+                    <h4 className="font-bold text-slate-800">Admin AI</h4>
+                    <p className="text-xs text-slate-500">Ask assistant</p>
+                 </div>
+              </button>
+           </div>
+        </section>
+      )}
+
+      {/* Intelligent Restock Nudge */}
+      {restockSuggestions.length > 0 && userRole === UserRole.CUSTOMER && (
+          <section className="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-2xl border border-indigo-100">
+             <div className="flex items-center gap-2 mb-4">
+                <Clock className="text-indigo-600" />
+                <div>
+                    <h2 className="text-xl font-bold text-indigo-900">Smart Restock Suggestions</h2>
+                    <p className="text-xs text-indigo-600">Based on your ordering history, you might be running low on these.</p>
+                </div>
+             </div>
+             <div className="flex overflow-x-auto gap-4 pb-2">
+                 {restockSuggestions.map(product => (
+                     <div key={product.id} className="min-w-[280px] bg-white p-3 rounded-xl border shadow-sm flex gap-3 items-center">
+                         <img src={product.imageUrl} className="w-16 h-16 rounded object-cover" alt="" />
+                         <div className="flex-1">
+                             <h4 className="font-bold text-sm text-slate-800">{product.brandName}</h4>
+                             <p className="text-xs text-slate-500 mb-2">{product.packing}</p>
+                             <button onClick={() => onAddToCart(product)} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold w-full">Restock Now</button>
+                         </div>
+                     </div>
+                 ))}
+             </div>
+          </section>
+      )}
+
+      {/* New Launches */}
+      {newLaunches.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                    <Zap size={20} />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800">New Arrivals</h2>
+            </div>
+            <button onClick={onViewAll} className="text-blue-600 font-medium text-sm hover:underline">View All</button>
+          </div>
+          <div className="flex overflow-x-auto gap-6 pb-4 no-scrollbar snap-x snap-mandatory">
+            {newLaunches.map(product => (
+              <div key={product.id} className="min-w-[280px] md:min-w-[300px] snap-start">
+                  <ProductCard 
+                    product={product} 
+                    userRole={userRole} 
+                    onAddToCart={onAddToCart}
+                    isWishlisted={wishlistIds.includes(product.id)}
+                    onToggleWishlist={onToggleWishlist}
+                    isCompared={compareListIds.includes(product.id)}
+                    onToggleCompare={onToggleCompare}
+                  />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Trending */}
+      {trending.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                    <TrendingUp size={20} />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800">Trending Now</h2>
+            </div>
+          </div>
+          <div className="flex overflow-x-auto gap-6 pb-4 no-scrollbar snap-x snap-mandatory">
+            {trending.map(product => (
+              <div key={product.id} className="min-w-[280px] md:min-w-[300px] snap-start">
+                  <ProductCard 
+                    product={product} 
+                    userRole={userRole} 
+                    onAddToCart={onAddToCart}
+                    isWishlisted={wishlistIds.includes(product.id)}
+                    onToggleWishlist={onToggleWishlist}
+                    isCompared={compareListIds.includes(product.id)}
+                    onToggleCompare={onToggleCompare}
+                  />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      
+      {/* Full Catalog Teaser */}
+       <section className="text-center py-8">
+            <button onClick={onViewAll} className="px-8 py-3 bg-slate-800 text-white rounded-full font-bold hover:bg-slate-900 transition shadow-lg flex items-center gap-2 mx-auto">
+                Browse Full Library <ArrowRight size={18} />
+            </button>
+       </section>
+
+    </div>
+  );
+};PK
+     HY=\0mÌÚ2m  2m     pages/Admin.tsximport React, { useState, useEffect } from 'react';
+import { Upload, Plus, FileSpreadsheet, Save, CheckCircle, Heart, User, Edit2, Search, Sparkles, Send, Image, FileText, Video, Star, Calendar, Tag, Trash2, Shield, Settings, Layout, Users, Gift } from 'lucide-react';
+import { Product, StockStatus, User as UserType, UserRole, Banner, CompanySettings } from '../types';
+import { askAdminAssistant, generateProductTags } from '../services/geminiService';
+
+interface AdminPanelProps {
+  products: Product[];
+  onAddProduct: (product: Product) => void;
+  onUpdateProduct: (product: Product) => void;
+  productToEdit?: Product | null;
+  onClearEdit?: () => void;
+  // New Props
+  users: UserType[];
+  onAddUser: (user: UserType) => void;
+  onUpdateUser: (user: UserType) => void;
+  divisions: string[];
+  onAddDivision: (division: string) => void;
+  banners: Banner[];
+  onUpdateBanners: (banners: Banner[]) => void;
+  companySettings: CompanySettings;
+  onUpdateSettings: (settings: CompanySettings) => void;
+  newsTicker: string[];
+  onUpdateNews: (news: string[]) => void;
+}
+
+export const AdminPanel: React.FC<AdminPanelProps> = ({ 
+  products, 
+  onAddProduct, 
+  onUpdateProduct, 
+  productToEdit, 
+  onClearEdit,
+  users,
+  onAddUser,
+  onUpdateUser,
+  divisions,
+  onAddDivision,
+  banners,
+  onUpdateBanners,
+  companySettings,
+  onUpdateSettings,
+  newsTicker,
+  onUpdateNews
+}) => {
+  const [activeTab, setActiveTab] = useState<'products' | 'users' | 'content' | 'settings' | 'ai'>('products');
+  const [subTab, setSubTab] = useState<'single' | 'bulk' | 'manage'>('single');
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'success'>('idle');
+  
+  // AI State
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isGeneratingTags, setIsGeneratingTags] = useState(false);
+
+  // Edit State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editSearch, setEditSearch] = useState('');
+
+  // Form State (Product)
+  const [formData, setFormData] = useState<Partial<Product>>({
+    brandName: '',
+    composition: '',
+    division: 'General',
+    mrp: 0,
+    packing: '',
+    stockStatus: StockStatus.AVAILABLE,
+    imageUrl: '',
+    visualAidUrl: '',
+    videoUrl: '',
+    launchDate: new Date().toISOString().split('T')[0],
+    isTrending: false,
+    tags: [],
+    isPromotional: false
+  });
+
+  // Handle external edit request from Product Card
+  useEffect(() => {
+    if (productToEdit) {
+        setEditingId(productToEdit.id);
+        setFormData({...productToEdit});
+        setActiveTab('products');
+        setSubTab('single');
+    }
+  }, [productToEdit]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'imageUrl' | 'visualAidUrl') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleEditClick = (product: Product) => {
+      setEditingId(product.id);
+      setFormData({...product});
+      setSubTab('single');
+  };
+
+  const handleToggleTrending = (product: Product) => {
+      onUpdateProduct({...product, isTrending: !product.isTrending});
+  };
+
+  const generateTags = async () => {
+      if (formData.brandName) {
+          setIsGeneratingTags(true);
+          const tags = await generateProductTags(formData.brandName, formData.composition || '');
+          setFormData(prev => ({...prev, tags}));
+          setIsGeneratingTags(false);
+      }
+  };
+
+  const handleSubmitProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    let finalTags = formData.tags || [];
+    if (finalTags.length === 0 && formData.brandName) {
+         setIsGeneratingTags(true);
+         finalTags = await generateProductTags(formData.brandName, formData.composition || '');
+         setIsGeneratingTags(false);
+    }
+    
+    // Auto set division for promotional
+    if(formData.isPromotional) {
+        formData.division = 'Marketing Inputs';
+    }
+
+    if (editingId) {
+        if (formData.brandName && formData.id) {
+            onUpdateProduct({ ...formData, tags: finalTags } as Product);
+            setEditingId(null);
+            setUploadStatus('success');
+            if (onClearEdit) onClearEdit();
+        }
+    } else {
+        const newProduct: Product = {
+            id: Math.random().toString(36).substr(2, 9),
+            brandName: formData.brandName || 'New Product',
+            composition: formData.composition || '',
+            division: formData.division || 'General',
+            packing: formData.packing || '',
+            mrp: formData.mrp || 0,
+            stockStatus: formData.stockStatus || StockStatus.AVAILABLE,
+            imageUrl: formData.imageUrl || 'https://picsum.photos/400/400', 
+            visualAidUrl: formData.visualAidUrl,
+            videoUrl: formData.videoUrl,
+            landingCost: formData.landingCost || 0,
+            launchDate: formData.launchDate || new Date().toISOString().split('T')[0],
+            isTrending: formData.isTrending || false,
+            tags: finalTags,
+            isPromotional: formData.isPromotional || false
+        };
+        onAddProduct(newProduct);
+        setUploadStatus('success');
+    }
+
+    setTimeout(() => setUploadStatus('idle'), 3000);
+    if (!editingId) setFormData({ 
+        brandName: '', composition: '', division: 'General', mrp: 0, packing: '',
+        imageUrl: '', visualAidUrl: '', videoUrl: '',
+        launchDate: new Date().toISOString().split('T')[0], isTrending: false, tags: [], isPromotional: false
+    });
+  };
+
+  // --- Render Functions ---
+
+  const renderProductTab = () => (
+    <div className="space-y-6">
+        <div className="flex border-b border-slate-200">
+             <button onClick={() => setSubTab('single')} className={`px-4 py-2 text-sm font-medium ${subTab === 'single' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600'}`}>Add/Edit Product</button>
+             <button onClick={() => setSubTab('manage')} className={`px-4 py-2 text-sm font-medium ${subTab === 'manage' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600'}`}>Manage Inventory</button>
+             <button onClick={() => setSubTab('bulk')} className={`px-4 py-2 text-sm font-medium ${subTab === 'bulk' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-600'}`}>Bulk Import</button>
+        </div>
+
+        {subTab === 'single' && (
+            <form onSubmit={handleSubmitProduct} className="max-w-2xl mx-auto space-y-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-slate-700">{editingId ? 'Edit Product' : 'Add New Product'}</h3>
+                    {editingId && <button type="button" onClick={() => {setEditingId(null); setFormData({}); if(onClearEdit) onClearEdit();}} className="text-sm text-red-500">Cancel</button>}
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-lg flex items-center gap-2 mb-4">
+                     <input type="checkbox" id="isPromo" className="w-5 h-5 text-blue-600 rounded" checked={formData.isPromotional} onChange={e => setFormData({...formData, isPromotional: e.target.checked, division: e.target.checked ? 'Marketing Inputs' : 'General'})} />
+                     <label htmlFor="isPromo" className="font-bold text-slate-700 flex items-center gap-2"><Gift size={18} className="text-purple-500"/> Is Promotional Material (Input Shop)</label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <input required placeholder="Product Name / Brand" className="border p-2 rounded col-span-2" value={formData.brandName} onChange={e => setFormData({...formData, brandName: e.target.value})} />
+                    
+                    {!formData.isPromotional && (
+                         <input required placeholder="Salt Composition" className="border p-2 rounded" value={formData.composition || ''} onChange={e => setFormData({...formData, composition: e.target.value})} />
+                    )}
+                    
+                    <select className="border p-2 rounded" value={formData.division} disabled={formData.isPromotional} onChange={e => setFormData({...formData, division: e.target.value})}>
+                        {divisions.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+
+                    <div className="relative">
+                        <span className="absolute left-3 top-2 text-slate-400">‚Çπ</span>
+                        <input required type="number" placeholder="MRP" className="border p-2 pl-6 rounded w-full" value={formData.mrp} onChange={e => setFormData({...formData, mrp: Number(e.target.value)})} />
+                        {formData.mrp === 0 && <span className="absolute right-3 top-2 text-green-600 text-xs font-bold">Free</span>}
+                    </div>
+
+                    <input required placeholder="Packing (e.g. 1 Unit, 10x10)" className="border p-2 rounded" value={formData.packing} onChange={e => setFormData({...formData, packing: e.target.value})} />
+                    
+                     <select className="border p-2 rounded" value={formData.stockStatus} onChange={e => setFormData({...formData, stockStatus: e.target.value as StockStatus})}>
+                        <option value={StockStatus.AVAILABLE}>Available</option>
+                        <option value={StockStatus.LOW_STOCK}>Low Stock</option>
+                        <option value={StockStatus.OUT_OF_STOCK}>Out of Stock</option>
+                     </select>
+                </div>
+                
+                 {/* AI Tags Section */}
+                 <div className="bg-slate-50 p-4 rounded-lg">
+                     <p className="text-xs font-bold text-slate-500 uppercase mb-2">Semantic Tags (AI)</p>
+                     <div className="flex flex-wrap gap-2 mb-2">
+                         {formData.tags?.map((tag, idx) => <span key={idx} className="bg-white px-2 py-1 rounded text-xs border">{tag}</span>)}
+                     </div>
+                     <button type="button" onClick={generateTags} disabled={!formData.brandName} className="text-xs text-blue-600 font-bold flex items-center gap-1"><Sparkles size={12}/> Generate Tags</button>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                         <label className="text-xs block mb-1">Image</label>
+                         <input type="file" onChange={(e) => handleFileUpload(e, 'imageUrl')} />
+                    </div>
+                     <div>
+                         <label className="text-xs block mb-1">Launch Date</label>
+                         <input type="date" className="border p-2 rounded w-full" value={formData.launchDate} onChange={(e) => setFormData({...formData, launchDate: e.target.value})} />
+                    </div>
+                 </div>
+
+                <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded font-bold">Save Product</button>
+            </form>
+        )}
+
+        {subTab === 'manage' && (
+             <div className="space-y-4">
+                 <input placeholder="Search inventory..." className="w-full border p-2 rounded" value={editSearch} onChange={e => setEditSearch(e.target.value)} />
+                 <div className="border rounded overflow-hidden">
+                     <table className="w-full text-sm text-left">
+                         <thead className="bg-slate-100"><tr><th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2">Stock</th><th className="p-2">Trending</th><th className="p-2">Action</th></tr></thead>
+                         <tbody>
+                             {products.filter(p => p.brandName.toLowerCase().includes(editSearch.toLowerCase())).map(p => (
+                                 <tr key={p.id} className="border-t">
+                                     <td className="p-2">{p.brandName}</td>
+                                     <td className="p-2">{p.isPromotional ? <span className="text-purple-600 font-bold text-xs">Promo</span> : 'Medicine'}</td>
+                                     <td className="p-2">{p.stockStatus}</td>
+                                     <td className="p-2 text-center"><button onClick={() => handleToggleTrending(p)}><Star size={16} className={p.isTrending ? "fill-orange-400 text-orange-400" : "text-slate-300"} /></button></td>
+                                     <td className="p-2"><button onClick={() => handleEditClick(p)} className="text-blue-600"><Edit2 size={16} /></button></td>
+                                 </tr>
+                             ))}
+                         </tbody>
+                     </table>
+                 </div>
+             </div>
+        )}
+        
+        {subTab === 'bulk' && <div className="text-center py-10 text-slate-500">Bulk Import via CSV placeholder</div>}
+    </div>
+  );
+
+  const renderUsersTab = () => {
+    const [newUser, setNewUser] = useState<Partial<UserType>>({ role: UserRole.CUSTOMER, isBlocked: false });
+    
+    const handleCreateUser = () => {
+        if(newUser.username && newUser.password && newUser.name) {
+            onAddUser({ ...newUser, id: Date.now().toString() } as UserType);
+            setNewUser({ role: UserRole.CUSTOMER, isBlocked: false, username: '', password: '', name: '' });
+        }
+    };
+
+    return (
+      <div className="max-w-4xl mx-auto space-y-8">
+         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+             <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><User size={20}/> Create New User</h3>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                 <div className="lg:col-span-1">
+                     <label className="text-xs block mb-1">Role</label>
+                     <select className="w-full p-2 border rounded" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}>
+                         <option value={UserRole.ADMIN}>Admin</option>
+                         <option value={UserRole.STAFF}>Staff</option>
+                         <option value={UserRole.CUSTOMER}>Distributor</option>
+                     </select>
+                 </div>
+                 <div className="lg:col-span-1">
+                     <label className="text-xs block mb-1">Full Name</label>
+                     <input className="w-full p-2 border rounded" placeholder="John Doe" value={newUser.name || ''} onChange={e => setNewUser({...newUser, name: e.target.value})} />
+                 </div>
+                 <div className="lg:col-span-1">
+                     <label className="text-xs block mb-1">Username</label>
+                     <input className="w-full p-2 border rounded" placeholder="username" value={newUser.username || ''} onChange={e => setNewUser({...newUser, username: e.target.value})} />
+                 </div>
+                 <div className="lg:col-span-1">
+                     <label className="text-xs block mb-1">Password</label>
+                     <input className="w-full p-2 border rounded" placeholder="password" value={newUser.password || ''} onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                 </div>
+                 <div className="lg:col-span-1">
+                     <button onClick={handleCreateUser} className="w-full bg-blue-600 text-white p-2 rounded font-bold hover:bg-blue-700">Create</button>
+                 </div>
+             </div>
+         </div>
+
+         <div>
+             <h3 className="font-bold text-lg mb-4">User List</h3>
+             <div className="border rounded-xl overflow-hidden">
+                 <table className="w-full text-sm text-left">
+                     <thead className="bg-slate-100">
+                         <tr>
+                             <th className="p-3">Name</th>
+                             <th className="p-3">Role</th>
+                             <th className="p-3">Username</th>
+                             <th className="p-3">Status</th>
+                             <th className="p-3">Action</th>
+                         </tr>
+                     </thead>
+                     <tbody className="divide-y">
+                         {users.map(u => (
+                             <tr key={u.id} className="bg-white">
+                                 <td className="p-3 font-medium">{u.name}</td>
+                                 <td className="p-3"><span className="bg-slate-100 px-2 py-1 rounded text-xs">{u.role}</span></td>
+                                 <td className="p-3 text-slate-500">{u.username}</td>
+                                 <td className="p-3">
+                                     {u.isBlocked ? <span className="text-red-500 font-bold text-xs">Blocked</span> : <span className="text-green-600 font-bold text-xs">Active</span>}
+                                 </td>
+                                 <td className="p-3">
+                                     <button 
+                                        onClick={() => onUpdateUser({...u, isBlocked: !u.isBlocked})}
+                                        className={`text-xs px-2 py-1 rounded border ${u.isBlocked ? 'border-green-200 text-green-600 hover:bg-green-50' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
+                                     >
+                                         {u.isBlocked ? 'Unblock' : 'Block'}
+                                     </button>
+                                 </td>
+                             </tr>
+                         ))}
+                     </tbody>
+                 </table>
+             </div>
+         </div>
+      </div>
+    );
+  };
+
+  const renderContentTab = () => {
+    const [newDivision, setNewDivision] = useState('');
+    const [newsInput, setNewsInput] = useState(newsTicker.join('\n'));
+
+    const handleSaveNews = () => {
+        onUpdateNews(newsInput.split('\n').filter(s => s.trim().length > 0));
+        alert("News Ticker Updated!");
+    };
+
+    return (
+      <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Divisions */}
+          <div className="space-y-4">
+              <h3 className="font-bold text-lg flex items-center gap-2"><Layout size={20}/> Specialty Divisions</h3>
+              <div className="flex gap-2">
+                  <input className="flex-1 border p-2 rounded" placeholder="New Division Name" value={newDivision} onChange={e => setNewDivision(e.target.value)} />
+                  <button onClick={() => {if(newDivision) {onAddDivision(newDivision); setNewDivision('')}}} className="bg-blue-600 text-white px-4 rounded font-bold"><Plus size={16}/></button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                  {divisions.map(d => <span key={d} className="bg-slate-100 px-3 py-1 rounded-full text-sm border">{d}</span>)}
+              </div>
+          </div>
+
+          {/* News Ticker */}
+          <div className="space-y-4">
+              <h3 className="font-bold text-lg flex items-center gap-2"><Calendar size={20}/> Flash News</h3>
+              <textarea 
+                className="w-full border p-2 rounded h-32 text-sm" 
+                value={newsInput}
+                onChange={e => setNewsInput(e.target.value)}
+                placeholder="Enter each news item on a new line..."
+              />
+              <button onClick={handleSaveNews} className="bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm w-full">Update News Ticker</button>
+          </div>
+
+          {/* Banners (Simplified View) */}
+          <div className="md:col-span-2 space-y-4 pt-4 border-t">
+              <h3 className="font-bold text-lg flex items-center gap-2"><Image size={20}/> Home Screen Banners</h3>
+              <p className="text-sm text-slate-500">Currently showing {banners.length} active banners.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {banners.map(b => (
+                      <div key={b.id} className="relative aspect-video bg-slate-100 rounded overflow-hidden group">
+                          <img src={b.imageUrl} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/50 text-white p-2 text-xs flex items-end opacity-0 group-hover:opacity-100 transition">
+                              {b.headline}
+                          </div>
+                      </div>
+                  ))}
+              </div>
+              <p className="text-xs text-slate-400 italic">Banner management UI is simplified for this demo.</p>
+          </div>
+      </div>
+    );
+  };
+
+  const renderSettingsTab = () => {
+    const [settings, setSettings] = useState(companySettings);
+
+    const handleSave = () => {
+        onUpdateSettings(settings);
+        alert("Settings Saved!");
+    };
+
+    return (
+        <div className="max-w-2xl mx-auto space-y-6">
+            <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Settings size={20}/> Company Settings</h3>
+            
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium mb-1">Company Name</label>
+                    <input className="w-full border p-2 rounded" value={settings.name} onChange={e => setSettings({...settings, name: e.target.value})} />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">Address</label>
+                    <input className="w-full border p-2 rounded" value={settings.address} onChange={e => setSettings({...settings, address: e.target.value})} />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">Support Phone</label>
+                    <input className="w-full border p-2 rounded" value={settings.phone} onChange={e => setSettings({...settings, phone: e.target.value})} />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">WhatsApp Number (No +)</label>
+                    <input className="w-full border p-2 rounded" value={settings.whatsappNumber} onChange={e => setSettings({...settings, whatsappNumber: e.target.value})} />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">Logo URL</label>
+                    <input className="w-full border p-2 rounded" value={settings.logoUrl} onChange={e => setSettings({...settings, logoUrl: e.target.value})} />
+                </div>
+            </div>
+
+            <button onClick={handleSave} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">Save Changes</button>
+        </div>
+    );
+  };
+  
+  const handleAskAI = async () => {
+      if (!aiQuery.trim()) return;
+      setIsAiLoading(true);
+      const context = JSON.stringify(products.map(p => ({name: p.brandName, stock: p.stockStatus, price: p.mrp})));
+      const res = await askAdminAssistant(aiQuery, context);
+      setAiResponse(res);
+      setIsAiLoading(false);
+  };
+
+  const renderAITab = () => (
+      <div className="max-w-2xl mx-auto">
+          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 text-white mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-2"><Sparkles /> Admin AI Assistant</h3>
+              <p className="text-purple-100 text-sm">Ask about market trends, draft descriptions, or analyze your inventory.</p>
+          </div>
+          <div className="bg-white border rounded-xl p-4 shadow-sm min-h-[300px] flex flex-col">
+              {aiResponse ? (
+                  <div className="bg-slate-50 p-4 rounded-lg mb-4 text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {aiResponse}
+                  </div>
+              ) : (
+                  <div className="flex-1 flex items-center justify-center text-slate-400 text-sm italic">
+                      AI response will appear here...
+                  </div>
+              )}
+              <div className="mt-auto relative">
+                  <input 
+                      type="text" 
+                      className="w-full border rounded-xl pr-12 pl-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none"
+                      placeholder="Ask me anything..."
+                      value={aiQuery}
+                      onChange={e => setAiQuery(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAskAI()}
+                  />
+                  <button onClick={handleAskAI} disabled={isAiLoading} className="absolute right-2 top-2 p-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50">
+                      {isAiLoading ? <span className="animate-spin text-xs">...</span> : <Send size={18} />}
+                  </button>
+              </div>
+          </div>
+      </div>
+  );
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h2 className="text-2xl font-bold text-slate-800 mb-6">Admin Dashboard</h2>
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px]">
+        {/* Main Tabs */}
+        <div className="flex border-b border-slate-200 overflow-x-auto no-scrollbar bg-slate-50">
+          <button 
+            className={`flex-1 py-4 px-4 text-sm font-bold transition whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'products' ? 'bg-white text-blue-600 border-t-2 border-blue-600' : 'text-slate-500 hover:bg-white/50'}`}
+            onClick={() => setActiveTab('products')}
+          >
+            <Layout size={18}/> Products
+          </button>
+          <button 
+            className={`flex-1 py-4 px-4 text-sm font-bold transition whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'users' ? 'bg-white text-blue-600 border-t-2 border-blue-600' : 'text-slate-500 hover:bg-white/50'}`}
+            onClick={() => setActiveTab('users')}
+          >
+            <Users size={18}/> Users
+          </button>
+          <button 
+            className={`flex-1 py-4 px-4 text-sm font-bold transition whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'content' ? 'bg-white text-blue-600 border-t-2 border-blue-600' : 'text-slate-500 hover:bg-white/50'}`}
+            onClick={() => setActiveTab('content')}
+          >
+            <Image size={18}/> Content
+          </button>
+          <button 
+            className={`flex-1 py-4 px-4 text-sm font-bold transition whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'settings' ? 'bg-white text-blue-600 border-t-2 border-blue-600' : 'text-slate-500 hover:bg-white/50'}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <Settings size={18}/> Settings
+          </button>
+           <button 
+            className={`flex-1 py-4 px-4 text-sm font-bold transition whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'ai' ? 'bg-white text-blue-600 border-t-2 border-blue-600' : 'text-slate-500 hover:bg-white/50'}`}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Sparkles size={18}/> AI
+          </button>
+        </div>
+
+        <div className="p-4 md:p-8">
+            {activeTab === 'products' && renderProductTab()}
+            {activeTab === 'users' && renderUsersTab()}
+            {activeTab === 'content' && renderContentTab()}
+            {activeTab === 'settings' && renderSettingsTab()}
+            {activeTab === 'ai' && renderAITab()}
+        </div>
+      </div>
+    </div>
+  );
+};PK
+     HY=\o¡.∏V=  V=      App.tsximport React, { useState } from 'react';
+import { Product, CartItem, UserRole, User, CompanySettings, Banner, Order, OrderStatus } from './types';
+import { INITIAL_PRODUCTS, INITIAL_DIVISIONS, INITIAL_BANNERS, INITIAL_NEWS_TICKER, INITIAL_SETTINGS, INITIAL_USERS, INITIAL_ORDERS } from './constants';
+import { Header, NewsTicker } from './components/Layout';
+import { Dashboard } from './pages/Dashboard';
+import { Catalog } from './pages/Catalog';
+import { AdminPanel } from './pages/Admin';
+import { Wishlist } from './pages/Wishlist';
+import { Compare } from './pages/Compare';
+import { Orders } from './pages/Orders';
+import { Login } from './pages/Login';
+import { PresentationModal } from './components/PresentationModal';
+import { Trash2, Send, X, ShoppingCart, CheckCircle } from 'lucide-react';
+
+export const App: React.FC = () => {
+  // Global Data State
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [divisions, setDivisions] = useState<string[]>(INITIAL_DIVISIONS);
+  const [banners, setBanners] = useState<Banner[]>(INITIAL_BANNERS);
+  const [newsTicker, setNewsTicker] = useState<string[]>(INITIAL_NEWS_TICKER);
+  const [companySettings, setCompanySettings] = useState<CompanySettings>(INITIAL_SETTINGS);
+  
+  // Orders State
+  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+
+  // User Session State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // App Functional State
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [compareList, setCompareList] = useState<string[]>([]);
+  const [presentationList, setPresentationList] = useState<string[]>([]);
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [catalogDivision, setCatalogDivision] = useState<string>('All');
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+
+  // Auth Actions
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    // If admin, default to dashboard but they have access to admin panel
+    setCurrentPage('dashboard');
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setCurrentPage('dashboard');
+    setCart([]);
+  };
+
+  // Logic: Actions
+  const addToCart = (product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
+    setIsCartOpen(true);
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart(prev => prev.filter(item => item.id !== id));
+  };
+
+  const updateQuantity = (id: string, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        return { ...item, quantity: Math.max(1, item.quantity + delta) };
+      }
+      return item;
+    }));
+  };
+
+  const toggleWishlist = (product: Product) => {
+    setWishlist(prev => 
+      prev.includes(product.id) 
+        ? prev.filter(id => id !== product.id) 
+        : [...prev, product.id]
+    );
+  };
+
+  const toggleCompare = (product: Product) => {
+    setCompareList(prev => {
+      if (prev.includes(product.id)) {
+        return prev.filter(id => id !== product.id);
+      }
+      if (prev.length >= 4) {
+        alert("You can compare up to 4 products at a time.");
+        return prev;
+      }
+      return [...prev, product.id];
+    });
+  };
+
+  const togglePresentation = (product: Product) => {
+    setPresentationList(prev => 
+      prev.includes(product.id) 
+        ? prev.filter(id => id !== product.id) 
+        : [...prev, product.id]
+    );
+  };
+
+  const handleCheckout = () => {
+    if (!currentUser) return;
+
+    // Create new Order Object
+    const newOrder: Order = {
+        id: `ORD-${Date.now().toString().slice(-6)}`,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        date: new Date().toISOString(),
+        status: OrderStatus.PENDING,
+        items: [...cart],
+        totalInquiryValue: cart.reduce((acc, item) => acc + (item.mrp * item.quantity), 0),
+    };
+
+    // Save Order
+    setOrders(prev => [newOrder, ...prev]);
+
+    // Generate WhatsApp Notification (Optional but good UX)
+    let message = `*NEW ORDER INQUIRY*\n*Order ID:* ${newOrder.id}\n*Customer:* ${currentUser.name}\n------------------\n`;
+    cart.forEach((item, index) => {
+      message += `${index + 1}. ${item.brandName} (${item.packing}) x ${item.quantity}\n`;
+    });
+    message += `\nTotal Items: ${cart.reduce((a, b) => a + b.quantity, 0)}\n`;
+    message += `Order placed via App. Please process immediately.`;
+
+    const url = `https://wa.me/${companySettings.whatsappNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+
+    // Reset Flow
+    setCart([]);
+    setIsCartOpen(false);
+    setCurrentPage('orders'); // Redirect to Orders page to see pending status
+    alert("Order Inquiry Sent Successfully! You can track status in 'My Orders'.");
+  };
+
+  const handleAddProduct = (newProduct: Product) => {
+    setProducts([newProduct, ...products]);
+  };
+
+  const handleUpdateProduct = (updatedProduct: Product) => {
+      setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  };
+
+  const handleAddUser = (user: User) => {
+      setUsers([...users, user]);
+  }
+
+  const handleUpdateUser = (updatedUser: User) => {
+      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+  }
+
+  const handleUpdateOrder = (updatedOrder: Order) => {
+      setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+  };
+
+  const navigateToCatalog = (division: string = 'All') => {
+    setCatalogDivision(division);
+    setCurrentPage('catalog');
+  };
+
+  const handleEditProduct = (product: Product) => {
+      setProductToEdit(product);
+      setCurrentPage('admin');
+  };
+
+  // Render Page Logic
+  if (!currentUser) {
+      return (
+          <Login 
+            users={users} 
+            onLogin={handleLogin}
+            companySettings={companySettings}
+          />
+      );
+  }
+
+  const renderPage = () => {
+    switch(currentPage) {
+        case 'dashboard':
+            return <Dashboard 
+                products={products} 
+                banners={banners}
+                userRole={currentUser.role} 
+                onAddToCart={addToCart} 
+                onViewAll={() => navigateToCatalog('All')}
+                wishlistIds={wishlist}
+                compareListIds={compareList}
+                onToggleWishlist={toggleWishlist}
+                onToggleCompare={toggleCompare}
+                onNavigateToCriticalCare={() => navigateToCatalog('Critical Care')}
+                onNavigateToNewLaunches={() => navigateToCatalog('All')}
+                onNavigateToAdmin={() => setCurrentPage('admin')}
+            />;
+        case 'catalog':
+        case 'Input Shop': // Handle Input Shop routing by showing Catalog with "Marketing Inputs" pre-selected
+             // Note: If navigating to Input Shop, the initialDivision prop below handles it.
+             // But if we are already mounted, we might need a useEffect in Catalog or force re-mount.
+             // However, passing initialDivision usually works if key changes or logic inside Catalog handles prop updates.
+             // Here, let's rely on Catalog's useEffect on initialDivision.
+            return <Catalog 
+                products={products} 
+                divisions={divisions}
+                userRole={currentUser.role} 
+                onAddToCart={addToCart}
+                wishlistIds={wishlist}
+                compareListIds={compareList}
+                presentationListIds={presentationList}
+                onToggleWishlist={toggleWishlist}
+                onToggleCompare={toggleCompare}
+                onTogglePresentation={togglePresentation}
+                initialDivision={currentPage === 'Input Shop' ? 'Marketing Inputs' : catalogDivision}
+                onEditProduct={handleEditProduct}
+            />;
+        case 'orders':
+            return <Orders 
+                orders={orders}
+                userRole={currentUser.role}
+                user={currentUser}
+                onUpdateOrder={handleUpdateOrder}
+            />;
+        case 'wishlist':
+            return <Wishlist 
+                products={products}
+                wishlistIds={wishlist}
+                userRole={currentUser.role}
+                onAddToCart={addToCart}
+                onToggleWishlist={toggleWishlist}
+                onToggleCompare={toggleCompare}
+                compareList={compareList}
+            />;
+        case 'compare':
+            return <Compare 
+                products={products}
+                compareListIds={compareList}
+                onRemoveFromCompare={(id) => setCompareList(prev => prev.filter(i => i !== id))}
+                onAddToCart={addToCart}
+                onClearCompare={() => setCompareList([])}
+            />;
+        case 'admin':
+            if (currentUser.role !== UserRole.ADMIN) return <div>Access Denied</div>;
+            return <AdminPanel 
+                products={products}
+                onAddProduct={handleAddProduct}
+                onUpdateProduct={handleUpdateProduct}
+                productToEdit={productToEdit}
+                onClearEdit={() => setProductToEdit(null)}
+                // New Props
+                users={users}
+                onAddUser={handleAddUser}
+                onUpdateUser={handleUpdateUser}
+                divisions={divisions}
+                onAddDivision={(d) => setDivisions([...divisions, d])}
+                banners={banners}
+                onUpdateBanners={setBanners}
+                companySettings={companySettings}
+                onUpdateSettings={setCompanySettings}
+                newsTicker={newsTicker}
+                onUpdateNews={setNewsTicker}
+            />;
+        default:
+            return <div>Page Not Found</div>;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
+      <NewsTicker items={newsTicker} />
+      <Header 
+        userRole={currentUser.role}
+        user={currentUser}
+        companySettings={companySettings}
+        cartCount={cart.reduce((a, b) => a + b.quantity, 0)} 
+        wishlistCount={wishlist.length}
+        compareCount={compareList.length}
+        presentationCount={presentationList.length}
+        onLogout={handleLogout}
+        onCartClick={() => setIsCartOpen(true)}
+        onPresentationClick={() => setIsPresentationOpen(true)}
+        currentPage={currentPage}
+        onNavigate={setCurrentPage}
+      />
+      
+      <main className="flex-grow">
+        {renderPage()}
+      </main>
+
+      <footer className="bg-slate-900 text-slate-400 py-8 text-center text-sm">
+          <p>&copy; 2024 {companySettings.name}. All rights reserved.</p>
+          <p className="text-xs text-slate-600 mt-2">{companySettings.address}</p>
+      </footer>
+
+      <PresentationModal 
+          isOpen={isPresentationOpen}
+          onClose={() => setIsPresentationOpen(false)}
+          selectedProductIds={presentationList}
+          allProducts={products}
+          onRemoveProduct={(id) => setPresentationList(prev => prev.filter(pid => pid !== id))}
+      />
+
+      {/* Cart Drawer Overlay */}
+      {isCartOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end">
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
+              <div className="relative bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                  <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                      <h2 className="text-lg font-bold flex items-center gap-2"><ShoppingCart size={20} /> Review Order</h2>
+                      <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-slate-200 rounded-full"><X size={20} /></button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {cart.length === 0 ? (
+                          <div className="text-center py-10 text-slate-400">
+                              <p>Your list is empty.</p>
+                              <button onClick={() => {setIsCartOpen(false); setCurrentPage('catalog')}} className="mt-4 text-blue-600 font-medium">Browse Products</button>
+                          </div>
+                      ) : (
+                          cart.map(item => (
+                              <div key={item.id} className="flex gap-4 p-3 border rounded-lg hover:border-blue-200 transition">
+                                  <img src={item.imageUrl} alt={item.brandName} className="w-16 h-16 object-cover rounded bg-slate-100" />
+                                  <div className="flex-1">
+                                      <h4 className="font-bold text-slate-800">{item.brandName}</h4>
+                                      <p className="text-xs text-slate-500">{item.packing}</p>
+                                      <div className="flex items-center gap-3 mt-2">
+                                          <button onClick={() => updateQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center bg-slate-100 rounded hover:bg-slate-200 font-bold">-</button>
+                                          <span className="text-sm font-medium">{item.quantity}</span>
+                                          <button onClick={() => updateQuantity(item.id, 1)} className="w-6 h-6 flex items-center justify-center bg-slate-100 rounded hover:bg-slate-200 font-bold">+</button>
+                                      </div>
+                                  </div>
+                                  <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 self-start"><Trash2 size={18} /></button>
+                              </div>
+                          ))
+                      )}
+                  </div>
+
+                  <div className="p-4 border-t bg-slate-50">
+                      <div className="flex justify-between mb-4 text-slate-600 font-medium">
+                          <span>Total Items:</span>
+                          <span>{cart.reduce((a, b) => a + b.quantity, 0)}</span>
+                      </div>
+                       <div className="flex justify-between mb-4 text-slate-800 font-bold text-lg">
+                          <span>Approx Value:</span>
+                          <span>‚Çπ{cart.reduce((a, b) => a + (b.mrp * b.quantity), 0).toLocaleString()}</span>
+                      </div>
+                      <button 
+                          onClick={handleCheckout}
+                          disabled={cart.length === 0}
+                          className={`w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 ${cart.length === 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200'}`}
+                      >
+                          <CheckCircle size={18} /> Send Order Inquiry
+                      </button>
+                      <p className="text-xs text-center text-slate-400 mt-2">Sends inquiry to staff. Status will appear in 'My Orders'.</p>
+                  </div>
+              </div>
+          </div>
+      )}
+    </div>
+  );
+};PK
+     HY=\ú∏ÏŸ:  :     pages/Wishlist.tsximport React from 'react';
+import { Product, UserRole } from '../types';
+import { ProductCard } from '../components/ProductCard';
+import { Heart } from 'lucide-react';
+
+interface WishlistProps {
+  products: Product[];
+  wishlistIds: string[];
+  userRole: UserRole;
+  onAddToCart: (product: Product) => void;
+  onToggleWishlist: (product: Product) => void;
+  onToggleCompare: (product: Product) => void;
+  compareList: string[];
+}
+
+export const Wishlist: React.FC<WishlistProps> = ({ 
+  products, 
+  wishlistIds, 
+  userRole, 
+  onAddToCart, 
+  onToggleWishlist,
+  onToggleCompare,
+  compareList
+}) => {
+  const wishlistProducts = products.filter(p => wishlistIds.includes(p.id));
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="p-3 bg-pink-100 text-pink-600 rounded-xl">
+          <Heart size={32} fill="currentColor" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">My Wishlist</h1>
+          <p className="text-slate-500">Saved items for future orders</p>
+        </div>
+      </div>
+
+      {wishlistProducts.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {wishlistProducts.map(product => (
+            <ProductCard 
+              key={product.id} 
+              product={product} 
+              userRole={userRole} 
+              onAddToCart={onAddToCart}
+              isWishlisted={true}
+              onToggleWishlist={onToggleWishlist}
+              isCompared={compareList.includes(product.id)}
+              onToggleCompare={onToggleCompare}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed">
+          <Heart size={48} className="mx-auto text-slate-300 mb-4" />
+          <h3 className="text-lg font-medium text-slate-700">Your wishlist is empty</h3>
+          <p className="text-slate-500 mb-6">Start browsing to add products you love.</p>
+        </div>
+      )}
+    </div>
+  );
+};PK
+     HY=\ö´˚W2  2     pages/Compare.tsximport React from 'react';
+import { Product, StockStatus } from '../types';
+import { Scale, X, ShoppingBag, Trash2 } from 'lucide-react';
+
+interface CompareProps {
+  products: Product[];
+  compareListIds: string[];
+  onRemoveFromCompare: (id: string) => void;
+  onAddToCart: (product: Product) => void;
+  onClearCompare: () => void;
+}
+
+export const Compare: React.FC<CompareProps> = ({ 
+  products, 
+  compareListIds, 
+  onRemoveFromCompare,
+  onAddToCart,
+  onClearCompare
+}) => {
+  const compareProducts = products.filter(p => compareListIds.includes(p.id));
+
+  if (compareProducts.length === 0) {
+    return (
+      <div className="container mx-auto px-4 py-12 text-center">
+         <div className="inline-block p-4 bg-purple-100 text-purple-600 rounded-full mb-4">
+            <Scale size={48} />
+         </div>
+         <h2 className="text-2xl font-bold text-slate-800 mb-2">Compare Products</h2>
+         <p className="text-slate-500">Select up to 4 products from the catalog to compare them side-by-side.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-end mb-6">
+        <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-100 text-purple-600 rounded-xl">
+                <Scale size={32} />
+            </div>
+            <div>
+                <h1 className="text-3xl font-bold text-slate-800">Compare Products</h1>
+                <p className="text-slate-500">{compareProducts.length} items selected</p>
+            </div>
+        </div>
+        <button 
+            onClick={onClearCompare}
+            className="flex items-center gap-2 text-red-500 hover:text-red-700 font-medium text-sm px-3 py-2 bg-red-50 rounded-lg hover:bg-red-100 transition"
+        >
+            <Trash2 size={16} /> Clear All
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[800px]">
+          <thead>
+            <tr>
+              <th className="p-4 border-b border-slate-100 w-48 bg-slate-50 text-slate-500 font-medium uppercase text-xs tracking-wider sticky left-0 z-10">
+                Attributes
+              </th>
+              {compareProducts.map(product => (
+                <th key={product.id} className="p-4 border-b border-slate-100 min-w-[200px] relative">
+                  <button 
+                    onClick={() => onRemoveFromCompare(product.id)}
+                    className="absolute top-2 right-2 text-slate-300 hover:text-red-500"
+                  >
+                    <X size={18} />
+                  </button>
+                  <div className="flex flex-col items-center text-center">
+                    <img src={product.imageUrl} alt={product.brandName} className="w-24 h-24 object-cover rounded-lg mb-3 shadow-sm" />
+                    <h3 className="font-bold text-slate-800 text-lg">{product.brandName}</h3>
+                  </div>
+                </th>
+              ))}
+              {/* Fill empty columns if less than 4 */}
+              {[...Array(4 - compareProducts.length)].map((_, i) => (
+                <th key={`empty-${i}`} className="p-4 border-b border-slate-100 min-w-[200px] bg-slate-50/50">
+                    <div className="h-full flex items-center justify-center text-slate-300 text-sm font-normal italic">
+                        Add product
+                    </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            <tr>
+              <td className="p-4 bg-slate-50 font-medium text-slate-700 sticky left-0">Composition</td>
+              {compareProducts.map(product => (
+                <td key={product.id} className="p-4 text-sm text-slate-600 align-top">{product.composition}</td>
+              ))}
+              {[...Array(4 - compareProducts.length)].map((_, i) => <td key={i} className="p-4 bg-slate-50/50"></td>)}
+            </tr>
+            <tr>
+              <td className="p-4 bg-slate-50 font-medium text-slate-700 sticky left-0">Division</td>
+              {compareProducts.map(product => (
+                <td key={product.id} className="p-4 text-sm text-slate-600 align-top">
+                    <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-semibold">{product.division}</span>
+                </td>
+              ))}
+              {[...Array(4 - compareProducts.length)].map((_, i) => <td key={i} className="p-4 bg-slate-50/50"></td>)}
+            </tr>
+            <tr>
+              <td className="p-4 bg-slate-50 font-medium text-slate-700 sticky left-0">Packing</td>
+              {compareProducts.map(product => (
+                <td key={product.id} className="p-4 text-sm text-slate-600 align-top">{product.packing}</td>
+              ))}
+               {[...Array(4 - compareProducts.length)].map((_, i) => <td key={i} className="p-4 bg-slate-50/50"></td>)}
+            </tr>
+            <tr>
+              <td className="p-4 bg-slate-50 font-medium text-slate-700 sticky left-0">MRP</td>
+              {compareProducts.map(product => (
+                <td key={product.id} className="p-4 text-lg font-bold text-blue-600 align-top">‚Çπ{product.mrp}</td>
+              ))}
+               {[...Array(4 - compareProducts.length)].map((_, i) => <td key={i} className="p-4 bg-slate-50/50"></td>)}
+            </tr>
+            <tr>
+              <td className="p-4 bg-slate-50 font-medium text-slate-700 sticky left-0">Stock Status</td>
+              {compareProducts.map(product => (
+                <td key={product.id} className="p-4 align-top">
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full border ${
+                        product.stockStatus === StockStatus.AVAILABLE ? 'bg-green-100 text-green-700 border-green-200' :
+                        product.stockStatus === StockStatus.LOW_STOCK ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                        product.stockStatus === StockStatus.COMING_SOON ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                        'bg-red-100 text-red-700 border-red-200'
+                    }`}>
+                        {product.stockStatus}
+                    </span>
+                </td>
+              ))}
+               {[...Array(4 - compareProducts.length)].map((_, i) => <td key={i} className="p-4 bg-slate-50/50"></td>)}
+            </tr>
+            <tr>
+                <td className="p-4 bg-slate-50 font-medium text-slate-700 sticky left-0">Action</td>
+                {compareProducts.map(product => (
+                    <td key={product.id} className="p-4 align-top">
+                         <button 
+                            onClick={() => onAddToCart(product)}
+                            disabled={product.stockStatus === StockStatus.OUT_OF_STOCK}
+                            className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-sm transition ${
+                                product.stockStatus === StockStatus.OUT_OF_STOCK 
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                            }`}
+                        >
+                            <ShoppingBag size={16} /> Order
+                        </button>
+                    </td>
+                ))}
+                 {[...Array(4 - compareProducts.length)].map((_, i) => <td key={i} className="p-4 bg-slate-50/50"></td>)}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};PK
+     HY=\∞ÄÇ<ë  ë     components/HeroCarousel.tsximport React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Banner } from '../types';
+
+interface HeroCarouselProps {
+  banners: Banner[];
+  onNavigateToCriticalCare: () => void;
+  onNavigateToNewLaunches: () => void;
+}
+
+export const HeroCarousel: React.FC<HeroCarouselProps> = ({ 
+  banners,
+  onNavigateToCriticalCare, 
+  onNavigateToNewLaunches 
+}) => {
+  const [current, setCurrent] = useState(0);
+
+  // Helper to map string link keys to actual functions
+  const handleAction = (linkTo?: string) => {
+      if (linkTo === 'Critical Care') onNavigateToCriticalCare();
+      else if (linkTo === 'New') onNavigateToNewLaunches();
+  };
+
+  // Auto-rotate
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrent(prev => (prev === banners.length - 1 ? 0 : prev + 1));
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [banners.length]);
+
+  const prevSlide = () => {
+    setCurrent(current === 0 ? banners.length - 1 : current - 1);
+  };
+
+  const nextSlide = () => {
+    setCurrent(current === banners.length - 1 ? 0 : current + 1);
+  };
+
+  if (banners.length === 0) return null;
+
+  return (
+    <div className="relative w-full h-[450px] md:h-[550px] overflow-hidden rounded-2xl shadow-xl group">
+      {/* Slides */}
+      {banners.map((slide, index) => (
+        <div 
+          key={slide.id}
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === current ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+        >
+          {/* Background Image */}
+          <img 
+            src={slide.imageUrl} 
+            alt={slide.headline}
+            className="w-full h-full object-cover"
+          />
+          {/* Overlay */}
+          <div className={`absolute inset-0 ${slide.overlayColor} flex items-center justify-center md:justify-start px-8 md:px-20`}>
+            <div className="max-w-3xl text-center md:text-left text-white space-y-6">
+                <h2 className="text-3xl md:text-6xl font-bold font-nexa leading-tight drop-shadow-md">
+                    {slide.headline}
+                </h2>
+                <p className="text-lg md:text-2xl text-blue-50 font-light leading-relaxed drop-shadow-sm">
+                    {slide.subheadline}
+                </p>
+                {slide.buttonText && (
+                    <button 
+                        onClick={() => handleAction(slide.linkTo)}
+                        className="mt-6 px-8 py-4 bg-white text-[#0056b3] font-bold rounded-full hover:bg-blue-50 transition transform hover:scale-105 shadow-lg inline-flex items-center gap-2"
+                    >
+                        {slide.buttonText} <ChevronRight size={20} />
+                    </button>
+                )}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Navigation Arrows */}
+      {banners.length > 1 && (
+        <>
+            <button 
+                onClick={prevSlide}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/40 backdrop-blur-sm p-3 rounded-full text-white transition opacity-0 group-hover:opacity-100 hidden md:block"
+            >
+                <ChevronLeft size={32} />
+            </button>
+            <button 
+                onClick={nextSlide}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/40 backdrop-blur-sm p-3 rounded-full text-white transition opacity-0 group-hover:opacity-100 hidden md:block"
+            >
+                <ChevronRight size={32} />
+            </button>
+        </>
+      )}
+
+      {/* Indicators */}
+      {banners.length > 1 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-3">
+            {banners.map((_, index) => (
+                <button
+                    key={index}
+                    onClick={() => setCurrent(index)}
+                    className={`h-2 rounded-full transition-all duration-300 shadow-sm ${index === current ? 'bg-white w-8' : 'bg-white/50 w-2 hover:bg-white/80'}`}
+                    aria-label={`Go to slide ${index + 1}`}
+                />
+            ))}
+        </div>
+      )}
+    </div>
+  );
+};PK
+     HY=\Æˆ¥=   =       components/PresentationModal.tsximport React, { useState } from 'react';
+import { X, Play, ChevronLeft, ChevronRight, Maximize2, Minimize2, Grid } from 'lucide-react';
+import { Product } from '../types';
+
+interface PresentationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedProductIds: string[];
+  allProducts: Product[];
+  onRemoveProduct: (id: string) => void;
+}
+
+export const PresentationModal: React.FC<PresentationModalProps> = ({
+  isOpen,
+  onClose,
+  selectedProductIds,
+  allProducts,
+  onRemoveProduct
+}) => {
+  const [mode, setMode] = useState<'selection' | 'presenting'>('selection');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [showVisualAid, setShowVisualAid] = useState(true); // Toggle between Product Image and Visual Aid
+
+  if (!isOpen) return null;
+
+  const presentationProducts = allProducts.filter(p => selectedProductIds.includes(p.id));
+
+  const handleStart = () => {
+    if (presentationProducts.length > 0) {
+      setMode('presenting');
+      setCurrentIndex(0);
+    }
+  };
+
+  const handleNext = () => {
+    setCurrentIndex(prev => (prev === presentationProducts.length - 1 ? 0 : prev + 1));
+    setShowVisualAid(true); // Reset to visual aid on slide change
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex(prev => (prev === 0 ? presentationProducts.length - 1 : prev - 1));
+    setShowVisualAid(true);
+  };
+
+  const currentProduct = presentationProducts[currentIndex];
+
+  if (mode === 'selection') {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+          <div className="p-6 border-b flex justify-between items-center bg-blue-900 text-white">
+            <h2 className="text-xl font-bold font-nexa">Prepare Presentation</h2>
+            <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full"><X size={20} /></button>
+          </div>
+          
+          <div className="p-6 overflow-y-auto flex-1">
+            {presentationProducts.length === 0 ? (
+              <div className="text-center py-10 text-slate-400">
+                <Grid size={48} className="mx-auto mb-4 opacity-50" />
+                <p>No products selected for presentation.</p>
+                <p className="text-sm">Go back and click the 'Projection' icon on products.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-500 mb-4">Select the sequence for the doctor visit:</p>
+                {presentationProducts.map((p, idx) => (
+                  <div key={p.id} className="flex items-center gap-4 p-3 border rounded-lg hover:border-blue-300 transition bg-slate-50">
+                    <span className="font-bold text-slate-400 w-6">{idx + 1}.</span>
+                    <img src={p.imageUrl} className="w-12 h-12 object-cover rounded bg-white" alt="" />
+                    <div className="flex-1">
+                      <h4 className="font-bold text-slate-800">{p.brandName}</h4>
+                      <p className="text-xs text-slate-500">{p.composition}</p>
+                    </div>
+                    <button onClick={() => onRemoveProduct(p.id)} className="text-red-400 hover:text-red-600 p-2"><X size={18} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 border-t bg-slate-50 flex justify-end gap-3">
+            <button onClick={onClose} className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition">Cancel</button>
+            <button 
+              onClick={handleStart}
+              disabled={presentationProducts.length === 0}
+              className={`px-8 py-3 bg-blue-600 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-blue-200 ${presentationProducts.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700 hover:scale-105 transition'}`}
+            >
+              <Play size={20} /> Start Presentation
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // PRESENTATION MODE
+  return (
+    <div className="fixed inset-0 z-[100] bg-white flex flex-col h-screen w-screen overflow-hidden">
+      {/* Top Controls (Hidden/Subtle) */}
+      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/50 to-transparent text-white opacity-0 hover:opacity-100 transition-opacity duration-300">
+        <h2 className="font-bold text-lg">{currentProduct.brandName}</h2>
+        <div className="flex gap-4">
+             <button onClick={() => setMode('selection')} className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full backdrop-blur-md hover:bg-black/60"><Grid size={16}/> List</button>
+             <button onClick={onClose} className="flex items-center gap-2 bg-red-500/80 px-3 py-1 rounded-full backdrop-blur-md hover:bg-red-600"><X size={16}/> Exit</button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 relative flex items-center justify-center bg-slate-50">
+        
+        {/* Toggle View Button */}
+        <div className="absolute top-20 right-8 z-40 flex flex-col gap-2">
+            <button 
+                onClick={() => setShowVisualAid(!showVisualAid)}
+                className="bg-white/90 backdrop-blur border border-slate-200 shadow-lg p-3 rounded-full text-blue-600 font-bold text-xs"
+                title="Toggle Visual Aid / Pack Shot"
+            >
+                {showVisualAid ? "Show Pack" : "Show VA"}
+            </button>
+        </div>
+
+        {/* Image Display */}
+        <div className="w-full h-full p-4 md:p-10 flex items-center justify-center">
+            <img 
+                src={showVisualAid && currentProduct.visualAidUrl ? currentProduct.visualAidUrl : currentProduct.imageUrl} 
+                alt="Presentation" 
+                className="max-h-full max-w-full object-contain drop-shadow-2xl animate-in fade-in zoom-in duration-500"
+            />
+            {showVisualAid && !currentProduct.visualAidUrl && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/5 backdrop-blur-sm">
+                    <p className="bg-white px-6 py-3 rounded-xl shadow-xl font-bold text-slate-500">No Visual Aid Available</p>
+                </div>
+            )}
+        </div>
+
+        {/* Info Overlay (Bottom) */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/90 to-transparent pt-12 pb-8 px-8">
+            <div className="max-w-4xl mx-auto text-center">
+                <h1 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-2 font-nexa">{currentProduct.brandName}</h1>
+                <p className="text-xl md:text-2xl text-slate-600 font-medium">{currentProduct.composition}</p>
+                <div className="mt-4 flex justify-center gap-4">
+                    <span className="px-4 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-bold uppercase tracking-wider">{currentProduct.division}</span>
+                    <span className="px-4 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-bold">{currentProduct.packing}</span>
+                </div>
+            </div>
+        </div>
+
+        {/* Navigation Arrows */}
+        <button onClick={handlePrev} className="absolute left-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white text-slate-800 shadow-lg backdrop-blur-sm transition hover:scale-110">
+            <ChevronLeft size={32} />
+        </button>
+        <button onClick={handleNext} className="absolute right-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white text-slate-800 shadow-lg backdrop-blur-sm transition hover:scale-110">
+            <ChevronRight size={32} />
+        </button>
+      </div>
+      
+      {/* Progress Bar */}
+      <div className="h-1 bg-slate-200 w-full">
+        <div 
+            className="h-full bg-blue-600 transition-all duration-300" 
+            style={{ width: `${((currentIndex + 1) / presentationProducts.length) * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+PK
+     HY=\Äc–Cœ  œ  
+   manifest.json{
+  "name": "Janus Biotech Portal",
+  "short_name": "JanusApp",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e3a8a",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3063/3063822.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3063/3063822.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}PK
+     HY=\†¨ík  k     pages/Login.tsximport React, { useState } from 'react';
+import { Package, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
+import { User, CompanySettings } from '../types';
+
+interface LoginProps {
+  users: User[];
+  onLogin: (user: User) => void;
+  companySettings: CompanySettings;
+}
+
+export const Login: React.FC<LoginProps> = ({ users, onLogin, companySettings }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const user = users.find(u => u.username === username && u.password === password);
+    
+    if (user) {
+      if (user.isBlocked) {
+        setError("Your account has been blocked. Contact Admin.");
+        return;
+      }
+      onLogin(user);
+    } else {
+      setError("Invalid username or password.");
+    }
+  };
+
+  const handleWhatsAppHelp = () => {
+      window.open(`https://wa.me/${companySettings.whatsappNumber}?text=Help%20recovering%20password`, '_blank');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-blue-900 p-8 text-center">
+            <div className="bg-white/10 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                <Package size={32} className="text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white font-nexa">{companySettings.name}</h1>
+            <p className="text-blue-200 text-sm mt-1">Authorized Distributor Portal</p>
+        </div>
+
+        {/* Form */}
+        <div className="p-8">
+            <form onSubmit={handleLogin} className="space-y-6">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                            placeholder="Enter your username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                        />
+                        <UserIcon className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                    <div className="relative">
+                        <input 
+                            type="password" 
+                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                            placeholder="‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                        <Lock className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                    </div>
+                </div>
+
+                {error && (
+                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2">
+                        <AlertCircle size={16} /> {error}
+                    </div>
+                )}
+
+                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-blue-200">
+                    Login Securely
+                </button>
+            </form>
+
+            <div className="mt-6 text-center">
+                <button onClick={handleWhatsAppHelp} className="text-sm text-slate-500 hover:text-blue-600 hover:underline">
+                    Forgot Password? Contact Support
+                </button>
+            </div>
+            
+            <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-400">
+                    Restricted Access. Unauthorized use is prohibited.
+                    <br />¬© 2024 Janus Biotech.
+                </p>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};PK
+     HY=\ÚVãŸyU  yU     pages/Orders.tsximport React, { useState } from 'react';
+import { ClipboardList, Clock, CheckCircle, Truck, FileText, Upload, DollarSign, X, ChevronDown, ChevronUp, AlertCircle, Eye } from 'lucide-react';
+import { Order, OrderStatus, UserRole, User } from '../types';
+
+interface OrdersProps {
+    orders: Order[];
+    userRole: UserRole;
+    user: User;
+    onUpdateOrder: (order: Order) => void;
+}
+
+const getStatusColor = (status: OrderStatus) => {
+    switch (status) {
+        case OrderStatus.PENDING: return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+        case OrderStatus.PROCESSING: return 'bg-blue-100 text-blue-700 border-blue-200';
+        case OrderStatus.PAYMENT_REQUESTED: return 'bg-orange-100 text-orange-700 border-orange-200';
+        case OrderStatus.PAYMENT_SUBMITTED: return 'bg-purple-100 text-purple-700 border-purple-200';
+        case OrderStatus.DISPATCHED: return 'bg-green-100 text-green-700 border-green-200';
+        case OrderStatus.CANCELLED: return 'bg-red-100 text-red-700 border-red-200';
+        default: return 'bg-slate-100 text-slate-600';
+    }
+};
+
+export const Orders: React.FC<OrdersProps> = ({ orders, userRole, user, onUpdateOrder }) => {
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
+    
+    // Process Modal State (Staff)
+    const [finalAmount, setFinalAmount] = useState<string>('');
+    const [invoiceFile, setInvoiceFile] = useState<string>('');
+    const [docketNumber, setDocketNumber] = useState('');
+
+    // Filter Logic
+    const myOrders = userRole === UserRole.CUSTOMER 
+        ? orders.filter(o => o.userId === user.id)
+        : orders;
+
+    // Sorting
+    const sortedOrders = [...myOrders].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const handleFileMockUpload = (e: React.ChangeEvent<HTMLInputElement>, setFunc: (val: string) => void) => {
+        if (e.target.files?.[0]) {
+            // Mock file URL creation
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFunc(reader.result as string);
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    };
+
+    const handleDistributorUploadProof = () => {
+        if (selectedOrder && invoiceFile) {
+            onUpdateOrder({
+                ...selectedOrder,
+                paymentProofUrl: invoiceFile, // reusing state variable for simplicity
+                status: OrderStatus.PAYMENT_SUBMITTED
+            });
+            setIsUploadModalOpen(false);
+            setInvoiceFile('');
+        }
+    };
+
+    const handleStaffProcessOrder = () => {
+        if (!selectedOrder) return;
+        
+        const updates: Partial<Order> = {};
+        
+        if (selectedOrder.status === OrderStatus.PENDING || selectedOrder.status === OrderStatus.PROCESSING) {
+            // Staff is requesting payment
+            if (finalAmount && invoiceFile) {
+                updates.status = OrderStatus.PAYMENT_REQUESTED;
+                updates.finalPayableAmount = parseFloat(finalAmount);
+                updates.invoiceUrl = invoiceFile;
+            }
+        } else if (selectedOrder.status === OrderStatus.PAYMENT_SUBMITTED || selectedOrder.status === OrderStatus.PAYMENT_REQUESTED) {
+            // Staff is dispatching
+            if (docketNumber) {
+                updates.status = OrderStatus.DISPATCHED;
+                updates.docketNumber = docketNumber;
+            }
+        }
+
+        onUpdateOrder({ ...selectedOrder, ...updates });
+        setIsProcessModalOpen(false);
+        setFinalAmount('');
+        setInvoiceFile('');
+        setDocketNumber('');
+    };
+
+    const openProcessModal = (order: Order) => {
+        setSelectedOrder(order);
+        setFinalAmount(order.finalPayableAmount?.toString() || order.totalInquiryValue.toString());
+        setIsProcessModalOpen(true);
+    };
+
+    return (
+        <div className="container mx-auto px-4 py-8">
+            <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
+                    <ClipboardList size={32} />
+                </div>
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-800">{userRole === UserRole.CUSTOMER ? 'My Orders' : 'Manage Orders'}</h1>
+                    <p className="text-slate-500">{userRole === UserRole.CUSTOMER ? 'Track your inquiries and payments' : 'Process incoming orders and dispatch'}</p>
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                {sortedOrders.length === 0 ? (
+                    <div className="text-center py-20 bg-white rounded-xl border border-dashed">
+                        <p className="text-slate-400">No orders found.</p>
+                    </div>
+                ) : (
+                    sortedOrders.map(order => (
+                        <div key={order.id} className="bg-white border border-slate-200 rounded-xl p-4 md:p-6 shadow-sm hover:shadow-md transition">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                                <div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-bold text-lg text-slate-800">#{order.id}</span>
+                                        <span className={`text-xs font-bold px-3 py-1 rounded-full border ${getStatusColor(order.status)}`}>
+                                            {order.status}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        {new Date(order.date).toLocaleDateString()} ‚Ä¢ {userRole !== UserRole.CUSTOMER && <span className="font-bold text-blue-600">{order.userName}</span>}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-slate-500">Inquiry Value (Approx)</p>
+                                    <p className="font-bold text-slate-800">‚Çπ{order.totalInquiryValue.toLocaleString()}</p>
+                                    {order.finalPayableAmount && (
+                                        <div className="mt-1">
+                                            <p className="text-xs text-green-600 font-bold">Final Payable: ‚Çπ{order.finalPayableAmount.toLocaleString()}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Expanded Details / Summary */}
+                            <div className="bg-slate-50 p-3 rounded-lg text-sm text-slate-600 mb-4">
+                                <p className="font-medium mb-2">{order.items.length} Items:</p>
+                                <ul className="list-disc pl-5 space-y-1">
+                                    {order.items.slice(0, 2).map((item, idx) => (
+                                        <li key={idx}>{item.brandName} x {item.quantity}</li>
+                                    ))}
+                                    {order.items.length > 2 && <li>...and {order.items.length - 2} more</li>}
+                                </ul>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-100">
+                                <button onClick={() => setSelectedOrder(order)} className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:bg-blue-50 px-3 py-2 rounded">
+                                    <Eye size={16} /> View Details
+                                </button>
+
+                                {/* Distributor Actions */}
+                                {userRole === UserRole.CUSTOMER && order.status === OrderStatus.PAYMENT_REQUESTED && (
+                                    <>
+                                        {order.invoiceUrl && (
+                                            <a href={order.invoiceUrl} download="invoice.png" className="flex items-center gap-1 text-sm font-bold text-slate-600 hover:bg-slate-100 px-3 py-2 rounded">
+                                                <FileText size={16} /> Download Bill
+                                            </a>
+                                        )}
+                                        <button 
+                                            onClick={() => {setSelectedOrder(order); setIsUploadModalOpen(true)}} 
+                                            className="flex items-center gap-1 text-sm font-bold bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded shadow-sm"
+                                        >
+                                            <Upload size={16} /> Upload Payment
+                                        </button>
+                                    </>
+                                )}
+
+                                {/* Staff Actions */}
+                                {(userRole === UserRole.STAFF || userRole === UserRole.ADMIN) && (
+                                    <button 
+                                        onClick={() => openProcessModal(order)}
+                                        className="flex items-center gap-1 text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded shadow-sm ml-auto"
+                                    >
+                                        <CheckCircle size={16} /> Process Order
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* View Details Modal */}
+            {selectedOrder && !isUploadModalOpen && !isProcessModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+                            <h2 className="text-xl font-bold text-slate-800">Order Details #{selectedOrder.id}</h2>
+                            <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-slate-200 rounded-full"><X size={20}/></button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div className="flex justify-between">
+                                <div>
+                                    <p className="text-sm text-slate-500">Status</p>
+                                    <span className={`text-sm font-bold px-2 py-1 rounded border ${getStatusColor(selectedOrder.status)}`}>{selectedOrder.status}</span>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm text-slate-500">Date</p>
+                                    <p className="font-medium">{new Date(selectedOrder.date).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+
+                            {selectedOrder.docketNumber && (
+                                <div className="bg-green-50 border border-green-200 p-3 rounded-lg flex items-center gap-3">
+                                    <Truck className="text-green-600" />
+                                    <div>
+                                        <p className="text-xs text-green-800 font-bold uppercase">Dispatched</p>
+                                        <p className="text-sm font-medium text-green-900">Docket: {selectedOrder.docketNumber}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Items</h3>
+                                <div className="space-y-3">
+                                    {selectedOrder.items.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-sm">
+                                            <div>
+                                                <p className="font-bold text-slate-800">{item.brandName}</p>
+                                                <p className="text-slate-500">{item.packing}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p>x {item.quantity}</p>
+                                                <p className="text-slate-400 text-xs">MRP ‚Çπ{item.mrp}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            <div className="bg-slate-100 p-4 rounded-lg flex justify-between items-center">
+                                <span className="font-bold text-slate-600">Total Inquiry Value</span>
+                                <span className="font-bold text-slate-800">‚Çπ{selectedOrder.totalInquiryValue.toLocaleString()}</span>
+                            </div>
+                            {selectedOrder.finalPayableAmount && (
+                                <div className="bg-green-100 border border-green-200 p-4 rounded-lg flex justify-between items-center">
+                                    <span className="font-bold text-green-800">Final Payable Amount</span>
+                                    <span className="font-bold text-green-900 text-xl">‚Çπ{selectedOrder.finalPayableAmount.toLocaleString()}</span>
+                                </div>
+                            )}
+
+                             {/* Attachments Section */}
+                             <div className="flex gap-4">
+                                {selectedOrder.invoiceUrl && (
+                                    <div className="flex-1 border p-3 rounded text-center">
+                                        <p className="text-xs text-slate-500 mb-2">Proforma Invoice</p>
+                                        <img src={selectedOrder.invoiceUrl} className="h-20 w-auto mx-auto object-contain border" alt="Invoice" />
+                                    </div>
+                                )}
+                                {selectedOrder.paymentProofUrl && (
+                                    <div className="flex-1 border p-3 rounded text-center">
+                                        <p className="text-xs text-slate-500 mb-2">Payment Proof</p>
+                                        <img src={selectedOrder.paymentProofUrl} className="h-20 w-auto mx-auto object-contain border" alt="Proof" />
+                                    </div>
+                                )}
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Upload Payment Modal (Distributor) */}
+            {isUploadModalOpen && selectedOrder && (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
+                        <h2 className="text-xl font-bold mb-4">Upload Payment Proof</h2>
+                        <p className="text-sm text-slate-600 mb-4">Please upload a screenshot of your UTR/Transaction for Order #{selectedOrder.id}.</p>
+                        
+                        <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:bg-slate-50 relative mb-4">
+                            <input type="file" accept="image/*" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" onChange={(e) => handleFileMockUpload(e, setInvoiceFile)} />
+                            {invoiceFile ? (
+                                <img src={invoiceFile} className="h-32 mx-auto object-contain" alt="Preview" />
+                            ) : (
+                                <div className="text-slate-400">
+                                    <Upload className="mx-auto mb-2" />
+                                    <span className="text-sm">Click to select image</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => {setIsUploadModalOpen(false); setInvoiceFile('')}} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded">Cancel</button>
+                            <button onClick={handleDistributorUploadProof} disabled={!invoiceFile} className="px-4 py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 disabled:opacity-50">Submit Proof</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Staff Process Modal */}
+            {isProcessModalOpen && selectedOrder && (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
+                        <h2 className="text-xl font-bold mb-2">Process Order #{selectedOrder.id}</h2>
+                        <p className="text-xs text-slate-500 mb-6">Current Status: {selectedOrder.status}</p>
+
+                        {(selectedOrder.status === OrderStatus.PENDING || selectedOrder.status === OrderStatus.PROCESSING) && (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Final Payable Amount (‚Çπ)</label>
+                                    <input 
+                                        type="number" 
+                                        className="w-full border rounded p-2" 
+                                        value={finalAmount} 
+                                        onChange={(e) => setFinalAmount(e.target.value)} 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Upload Invoice/Bill</label>
+                                    <input type="file" onChange={(e) => handleFileMockUpload(e, setInvoiceFile)} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                                </div>
+                                <div className="bg-orange-50 p-3 rounded text-xs text-orange-800">
+                                    <p>Action: This will change status to <strong>Payment Requested</strong> and notify the distributor.</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {(selectedOrder.status === OrderStatus.PAYMENT_SUBMITTED || selectedOrder.status === OrderStatus.PAYMENT_REQUESTED) && (
+                            <div className="space-y-4">
+                                {selectedOrder.paymentProofUrl && (
+                                    <div className="mb-4">
+                                        <p className="text-xs font-bold mb-1">Distributor Payment Proof:</p>
+                                        <img src={selectedOrder.paymentProofUrl} className="h-24 object-contain border rounded" alt="Proof" />
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Courier Docket No / Transport Details</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full border rounded p-2" 
+                                        value={docketNumber} 
+                                        onChange={(e) => setDocketNumber(e.target.value)}
+                                        placeholder="e.g. DTDC-123456789" 
+                                    />
+                                </div>
+                                <div className="bg-green-50 p-3 rounded text-xs text-green-800">
+                                    <p>Action: This will mark order as <strong>Dispatched</strong>.</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 justify-end mt-6">
+                            <button onClick={() => setIsProcessModalOpen(false)} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded">Cancel</button>
+                            <button onClick={handleStaffProcessOrder} className="px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700">Update Status</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};PK
+     HY=\CÀÅ
+  
+     package.json{
+  "name": "janus-biotech-india-pvt-ltd",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react-dom": "^19.2.4",
+    "lucide-react": "^0.563.0",
+    "react-router-dom": "^7.13.0",
+    "@google/genai": "^1.38.0",
+    "react": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
+PK
+     HY=\5⁄ÙÖ      
+   index.html<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Janus Biotech India Pvt Ltd</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1e3a8a">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Inter', sans-serif; }
+      .font-nexa {
+        font-family: 'Nexa', 'Montserrat', sans-serif;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+          display: none;
+      }
+      .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+      }
+      @keyframes marquee {
+        0% { transform: translateX(100%); }
+        100% { transform: translateX(-100%); }
+      }
+      .animate-marquee {
+        display: inline-block;
+        white-space: nowrap;
+        animation: marquee 20s linear infinite;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>PK
+     HY=\&Hxa  a  	   index.tsximport React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './App';
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);PK
+     HY=\∂H¨    
+   tsconfig.json{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
+}PK
+     HY=\À£Ò®D  D     vite.config.tsimport path from 'path';
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, '.', '');
+    return {
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+      },
+      plugins: [react()],
+      define: {
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+      },
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, '.'),
+        }
+      }
+    };
+});
+PK
+     HY=\ÓxÎX#   #   
+   .env.localGEMINI_API_KEY=PLACEHOLDER_API_KEY
+PK
+     HY=\§™ı…˝   ˝   
+   .gitignore# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+PK
+     HY=\ë;ON    	   README.md<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/temp/1
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+PK 
+     HY=\òP˜%ú   ú   
+                 metadata.jsonPK 
+     HY=\.∆äK	  K	               «   types.tsPK 
+     HY=\n®T                 8
+  constants.tsPK 
+     HY=\            	            {$  services/PK 
+     HY=\≥(>HV  V               ¢$  services/geminiService.tsPK 
+     HY=\            
+            /:  components/PK 
+     HY=\e4†®-  ®-               X:  components/Layout.tsxPK 
+     HY=\∆PaR2  R2               3h  components/ProductCard.tsxPK 
+     HY=\                        Ωö  pages/PK 
+     HY=\}•;b(  b(               ·ö  pages/Catalog.tsxPK 
+     HY=\\Gzàå&  å&               r√  pages/Dashboard.tsxPK 
+     HY=\0mÌÚ2m  2m               /Í  pages/Admin.tsxPK 
+     HY=\o¡.∏V=  V=                éW App.tsxPK 
+     HY=\ú∏ÏŸ:  :               	ï pages/Wishlist.tsxPK 
+     HY=\ö´˚W2  2               sù pages/Compare.tsxPK 
+     HY=\∞ÄÇ<ë  ë               ‘ª components/HeroCarousel.tsxPK 
+     HY=\Æˆ¥=   =                 ûÃ components/PresentationModal.tsxPK 
+     HY=\Äc–Cœ  œ  
+             Ì manifest.jsonPK 
+     HY=\†¨ík  k               Ô pages/Login.tsxPK 
+     HY=\ÚVãŸyU  yU               ´  pages/Orders.tsxPK 
+     HY=\CÀÅ
+  
+               RV package.jsonPK 
+     HY=\5⁄ÙÖ      
+             ÜX index.htmlPK 
+     HY=\&Hxa  a  	             ∆_ index.tsxPK 
+     HY=\∂H¨    
+             Na tsconfig.jsonPK 
+     HY=\À£Ò®D  D               óc vite.config.tsPK 
+     HY=\ÓxÎX#   #   
+              f .env.localPK 
+     HY=\§™ı…˝   ˝   
+             Rf .gitignorePK 
+     HY=\ë;ON    	             wg README.mdPK      ¶  ¶i   

@@ -1,0 +1,108 @@
+function moveDispatchedRecords() {
+  // --- CONFIGURATION ---
+  
+  // 1. Source Details
+  var sourceSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sourceSheet = sourceSpreadsheet.getSheetByName("DISPATCH");
+  
+  // 2. Destination 1: DISPATCH MASTER
+  var destSpreadsheetId = "1e0Sxt0sehgGuaW2lU-tfo5Pg-DZbFzeYdpuH3dxODDs"; // Original Master Sheet ID
+  var destSpreadsheet = SpreadsheetApp.openById(destSpreadsheetId);
+  var destSheet = destSpreadsheet.getSheetByName("DISPATCH MASTER");
+
+  // 3. Destination 2: AFTER DISPATCH FMS
+  // Extracted ID from your link
+  var fmsSpreadsheetId = "1eTjLrB_iNI27dJmSUzq4jsfStQA9heORjHfkVtPzBG4"; 
+  var fmsSpreadsheet = SpreadsheetApp.openById(fmsSpreadsheetId);
+  var fmsSheet = fmsSpreadsheet.getSheetByName("AFTER DISPATCH");
+  
+  // --- VALIDATION ---
+
+  if (!sourceSheet) {
+    SpreadsheetApp.getUi().alert("Source sheet 'DISPATCH' not found");
+    return;
+  }
+  
+  if (!destSheet) {
+    SpreadsheetApp.getUi().alert("Destination sheet 'DISPATCH MASTER' not found");
+    return;
+  }
+
+  if (!fmsSheet) {
+    SpreadsheetApp.getUi().alert("Second Destination sheet 'AFTER DISPATCH' not found");
+    return;
+  }
+  
+  // --- DATA PROCESSING ---
+
+  // Get all data from source sheet
+  var lastRow = sourceSheet.getLastRow();
+  if (lastRow <= 1) {
+    Logger.log("No data rows to process");
+    return;
+  }
+  
+  var data = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
+  
+  // Find the DISPATCH STATUS column (column I = index 8)
+  var dispatchStatusCol = 8; // Column I (0-indexed)
+  
+  var rowsToMove = [];
+  var rowsToDelete = [];
+  
+  // Identify rows with "Dispatched" status
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][dispatchStatusCol] === "Dispatched") {
+      rowsToMove.push(data[i]);
+      rowsToDelete.push(i + 2); // +2 because array is 0-indexed and we skip header row
+    }
+  }
+  
+  if (rowsToMove.length === 0) {
+    SpreadsheetApp.getUi().alert("No dispatched records found to move.");
+    return;
+  }
+  
+  // --- WRITING TO DESTINATION 1: DISPATCH MASTER ---
+  
+  var destLastRow = destSheet.getLastRow();
+  if (destLastRow === 0 || destSheet.getRange(1, 1).getValue() === "") {
+    // If destination is empty, add header first from source
+    var headers = sourceSheet.getRange(1, 1, 1, sourceSheet.getLastColumn()).getValues();
+    destSheet.getRange(1, 1, 1, headers[0].length).setValues(headers);
+    destLastRow = 1;
+  }
+  destSheet.getRange(destLastRow + 1, 1, rowsToMove.length, rowsToMove[0].length).setValues(rowsToMove);
+
+
+  // --- WRITING TO DESTINATION 2: AFTER DISPATCH (New Requirement) ---
+
+  var fmsLastRow = fmsSheet.getLastRow();
+  var fmsTargetRow = fmsLastRow + 1;
+
+  // Logic: Ensure we start at Row 8 minimum if the sheet is mostly empty
+  // (Assuming rows 1-6 are headers, and row 7 might be a spacer)
+  if (fmsTargetRow < 8) {
+    fmsTargetRow = 8;
+  }
+
+  fmsSheet.getRange(fmsTargetRow, 1, rowsToMove.length, rowsToMove[0].length).setValues(rowsToMove);
+
+
+  // --- CLEANUP: DELETE FROM SOURCE ---
+
+  // Delete rows from source sheet (delete in reverse order to maintain row indices)
+  for (var j = rowsToDelete.length - 1; j >= 0; j--) {
+    sourceSheet.deleteRow(rowsToDelete[j]);
+  }
+  
+  Logger.log("Moved " + rowsToMove.length + " dispatched record(s)");
+  SpreadsheetApp.getUi().alert("Success! Moved " + rowsToMove.length + " record(s) to 'DISPATCH MASTER' and 'AFTER DISPATCH'.");
+}
+
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('Dispatch Manager')
+      .addItem('Move Dispatched Records', 'moveDispatchedRecords')
+      .addToUi();
+}
